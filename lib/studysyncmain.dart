@@ -7,8 +7,6 @@ import 'package:untitled/ProfilePage.dart';
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 
-
-
 class StudySyncDashboard extends StatefulWidget {
   final String userId;
 
@@ -71,51 +69,61 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Color(0xFFfae5d3),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Section
-                HeaderSection(onLinkPressed: (section) {
-                  setState(() {
-                    selectedSection = section;
-                  });
-                }),
-                SizedBox(height: 20),
-
-                // Middle content changes based on selected section
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (selectedSection == 'studysync') ...[
-                        Expanded(flex: 2, child: ToDoSection()),
-                        SizedBox(width: 20),
-                        Expanded(flex: 3, child: StatsSection(
-                            totalTimeSpentThisWeek: totalTimeSpentThisWeek)),
-                      ] else
-                        if (selectedSection == 'friends') ...[
-                          Expanded(child: FriendsPage()),
+      home: WillPopScope(
+        onWillPop: () async {
+          // This ensures that pressing back always navigates to the StudySync page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudySyncDashboard(userId: widget.userId),
+            ),
+          );
+          return false; // Prevent default back navigation
+        },
+        child: Scaffold(
+          backgroundColor: Color(0xFFfae5d3),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Section
+                  HeaderSection(onLinkPressed: (section) {
+                    setState(() {
+                      selectedSection = section;
+                    });
+                  }),
+                  SizedBox(height: 20),
+                  // Middle content changes based on selected section
+                  Expanded(
+                    child: Row(
+                      children: [
+                        if (selectedSection == 'studysync') ...[
+                          Expanded(flex: 2, child: ToDoSection()),
+                          SizedBox(width: 20),
+                          Expanded(flex: 3, child: StatsSection(
+                              totalTimeSpentThisWeek: totalTimeSpentThisWeek)),
                         ] else
-                          if (selectedSection == 'groups') ...[
-                            Expanded(child: GroupsPage()),
+                          if (selectedSection == 'friends') ...[
+                            Expanded(child: FriendsPage()),
                           ] else
-                            if (selectedSection == 'profile') ...[
-                              Expanded(child: ProfilePage()),
-                            ],
-                    ],
+                            if (selectedSection == 'groups') ...[
+                              Expanded(child: GroupsPage()),
+                            ] else
+                              if (selectedSection == 'profile') ...[
+                                Expanded(child: ProfilePage()),
+                              ],
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 20),
-
-                // Conditional advertisement section
-                if (selectedSection == 'studysync') ...[
-                  AdvertisementSection(),
+                  SizedBox(height: 20),
+                  // Conditional advertisement section
+                  if (selectedSection == 'studysync') ...[
+                    AdvertisementSection(),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -123,7 +131,6 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
     );
   }
 }
-
 // Header Section
 class HeaderSection extends StatelessWidget {
   final Function(String) onLinkPressed;

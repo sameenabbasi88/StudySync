@@ -82,25 +82,29 @@ class _GroupsPageState extends State<GroupsPage> {
                       ),
                     ),
                     SizedBox(height: 16),
-                    // Search Bar within the groups container
-                    TextField(
-                      controller: searchController,
-                      onChanged: (value) {
-                        setState(() {
-                          searchQuery = value.toLowerCase();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Search groups',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+
+                    // Only show the search bar if no group is selected
+                    if (selectedGroup == null)
+                      TextField(
+                        controller: searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            searchQuery = value.toLowerCase();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Search groups',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
+
                     SizedBox(height: 16),
+
                     Expanded(
                       child: selectedGroup == null
                           ? StreamBuilder<QuerySnapshot>(
@@ -120,8 +124,7 @@ class _GroupsPageState extends State<GroupsPage> {
                               .where((doc) {
                             final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
                             return groupName.contains(searchQuery);
-                          })
-                              .toList();
+                          }).toList();
 
                           return GridView.builder(
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -152,6 +155,7 @@ class _GroupsPageState extends State<GroupsPage> {
               ),
             ),
             SizedBox(width: 16),
+            // The Friends list remains the same
             Expanded(
               flex: 1,
               child: Container(

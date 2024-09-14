@@ -371,7 +371,6 @@ class _TaskManagerState extends State<TaskManager> {
   }
 }
 
-
 class TaskPopupItem extends StatelessWidget {
   final String task;
   final String groupId;
@@ -453,7 +452,6 @@ class TaskPopupItem extends StatelessWidget {
     );
   }
 }
-
 
 class Task {
   final String taskName;
