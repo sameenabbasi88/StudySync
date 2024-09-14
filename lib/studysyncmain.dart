@@ -1,15 +1,28 @@
-import 'dart:async';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:untitled/GroupsPage.dart';
+import 'package:untitled/ProfilePage.dart';
 
-import 'TimerScreen.dart'; // For formatting the date
+import 'Friendpage.dart';
+import 'TimerScreen.dart';
 
-void main() {
-  runApp(StudySyncDashboard());
+
+
+class StudySyncDashboard extends StatefulWidget {
+  final String userId;
+
+  StudySyncDashboard({required this.userId});
+
+  @override
+  _StudySyncDashboardState createState() => _StudySyncDashboardState();
 }
 
-class StudySyncDashboard extends StatelessWidget {
+class _StudySyncDashboardState extends State<StudySyncDashboard> {
+  String selectedSection = 'studysync'; // Default section
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -23,25 +36,39 @@ class StudySyncDashboard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header Section
-                HeaderSection(),
+                HeaderSection(onLinkPressed: (section) {
+                  setState(() {
+                    selectedSection = section;
+                  });
+                }),
                 SizedBox(height: 20),
+
+                // Middle content changes based on selected section
                 Expanded(
                   child: Row(
                     children: [
-                      // Left: TO-DO List
-                      Expanded(flex: 2, child: ToDoSection()),
-                      SizedBox(width: 20),
-                      // Right: Daily Streak & Time Spent
-                      Expanded(flex: 3, child: StatsSection()),
+                      if (selectedSection == 'studysync') ...[
+                        Expanded(flex: 2, child: ToDoSection()),
+                        SizedBox(width: 20),
+                        Expanded(flex: 3, child: StatsSection()),
+                      ] else if (selectedSection == 'friends') ...[
+                        Expanded(child: FriendsPage()),
+                      ] else if (selectedSection == 'groups') ...[
+                        Expanded(child: GroupsPage()),
+                      ] else if (selectedSection == 'profile') ...[
+                        Expanded(child: ProfilePage()),
+                      ],
                     ],
                   ),
                 ),
                 SizedBox(height: 20),
-                // Start Studying Button
-                StartStudyingButton(),
-                SizedBox(height: 10),
-                // Advertisement Section
-                AdvertisementSection(),
+
+                // Conditional "Start Studying" button and advertisement
+                if (selectedSection == 'studysync') ...[
+                  StartStudyingButton(),
+                  SizedBox(height: 10),
+                  AdvertisementSection(),
+                ],
               ],
             ),
           ),
@@ -53,11 +80,18 @@ class StudySyncDashboard extends StatelessWidget {
 
 // Header Section
 class HeaderSection extends StatelessWidget {
+  final Function(String) onLinkPressed;
+
+  const HeaderSection({required this.onLinkPressed});
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
+        GestureDetector(
+          onTap: () {
+            onLinkPressed('studysync'); // Show StudySync context
+          },
           child: Text(
             'STUDYSYNC',
             style: TextStyle(
@@ -67,40 +101,189 @@ class HeaderSection extends StatelessWidget {
             ),
           ),
         ),
-        HeaderLink(text: 'Friends'),
-        SizedBox(width: 60,),
-        HeaderLink(text: 'Groups'),
-        SizedBox(width: 60,),
-        HeaderLink(text: 'Profile'),
-        SizedBox(width: 20,),
+        Spacer(),
+        HeaderLink(text: 'Friends', onLinkPressed: onLinkPressed),
+        SizedBox(width: 60),
+        HeaderLink(text: 'Groups', onLinkPressed: onLinkPressed),
+        SizedBox(width: 60),
+        HeaderLink(text: 'Profile', onLinkPressed: onLinkPressed),
+        SizedBox(width: 20),
       ],
     );
   }
 }
-
 class HeaderLink extends StatelessWidget {
   final String text;
+  final Function(String) onLinkPressed;
 
-  const HeaderLink({required this.text});
+  const HeaderLink({required this.text, required this.onLinkPressed});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
+    // Fetch screen width
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Determine font size and padding dynamically based on screen width
+    double fontSize = screenWidth * 0.045; // Adjusts font size relative to screen
+    double horizontalPadding = screenWidth * 0.02; // Adjust padding
+
+    return GestureDetector(
+      onTap: () {
+        onLinkPressed(text.toLowerCase()); // Pass which link was clicked
+      },
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: fontSize.clamp(14, 22), // Min 14, Max 22 font size
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
       ),
     );
   }
 }
 
+
 // TO-DO Section
-class ToDoSection extends StatelessWidget {
+class ToDoSection extends StatefulWidget {
+  @override
+  _ToDoSectionState createState() => _ToDoSectionState();
+}
+
+class _ToDoSectionState extends State<ToDoSection> {
+  List<Map<String, dynamic>> todoList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTodoItems();
+  }
+
+  // Function to fetch items from the database
+  void _fetchTodoItems() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      // Fetch the user's todo items from the database
+      DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId)
+          .get();
+
+      if (docSnapshot.exists) {
+        List<dynamic> tasks = docSnapshot.get('Todotasks') ?? [];
+        setState(() {
+          todoList = tasks.map((task) {
+            return {
+              'title': task['title'],
+              'date': DateTime.parse(task['date']),
+            };
+          }).toList();
+        });
+      }
+    } else {
+      // Handle case where user is not logged in
+      print('No user is logged in.');
+    }
+  }
+
+  // Function to show the add item dialog
+  void _showAddItemDialog() {
+    TextEditingController taskController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Add To-Do Item"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: taskController,
+                    decoration: InputDecoration(hintText: "Task Name"),
+                  ),
+                  SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2101),
+                      );
+                      if (pickedDate != null && pickedDate != selectedDate) {
+                        setState(() {
+                          selectedDate = pickedDate;
+                        });
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today),
+                        SizedBox(width: 10),
+                        Text(DateFormat('EEE, d MMM').format(selectedDate)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: Text("Cancel"),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child: Text("Add"),
+                  onPressed: () {
+                    _addTodoItem(taskController.text, selectedDate);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Function to add item to the list and store it in the database
+  void _addTodoItem(String title, DateTime date) async {
+    if (title.isNotEmpty) {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      String userId = currentUser?.uid ?? '';
+
+      if (userId.isNotEmpty) {
+        setState(() {
+          todoList.add({'title': title, 'date': date});
+        });
+
+        // Use set with merge: true to avoid the not-found error if the document doesn't exist
+        await FirebaseFirestore.instance
+            .collection('todoTasks')
+            .doc(userId)
+            .set({
+          'Todotasks': FieldValue.arrayUnion([{
+            'title': title,
+            'date': date.toIso8601String()
+          }])
+        }, SetOptions(merge: true));
+      } else {
+        print('No user is logged in.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -122,23 +305,31 @@ class ToDoSection extends StatelessWidget {
           ),
           SizedBox(height: 10),
           Expanded(
-            child: ListView(
+            child: ListView.builder(
+              itemCount: todoList.length,
+              itemBuilder: (context, index) {
+                return ToDoItem(
+                  title: todoList[index]['title'],
+                  initialDate: todoList[index]['date'],
+                );
+              },
+            ),
+          ),
+          SizedBox(height: 10),
+          GestureDetector(
+            onTap: _showAddItemDialog,
+            child: Row(
               children: [
-                ToDoItem(title: 'Organic Chemistry Lecture', initialDate: DateTime(2023, 9, 1)),
-                ToDoItem(title: 'Economics Essay', initialDate: DateTime(2023, 9, 1)),
-                ToDoItem(title: 'Economics Essay', initialDate: DateTime(2023, 9, 2)),
-                SizedBox(height: 10,),
-                Row(
-                  children: [
-                    Icon(Icons.add_circle,color: Colors.white,),
-                    SizedBox(width: 20,),
-                    Text('Add Item',style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),),
-                  ],
-                )
+                Icon(Icons.add_circle, color: Colors.white),
+                SizedBox(width: 20),
+                Text(
+                  'Add Item',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
@@ -148,87 +339,58 @@ class ToDoSection extends StatelessWidget {
   }
 }
 
-// ToDoItem class with clickable date picker
-class ToDoItem extends StatefulWidget {
+
+class ToDoItem extends StatelessWidget {
   final String title;
   final DateTime initialDate;
 
   const ToDoItem({required this.title, required this.initialDate});
 
   @override
-  _ToDoItemState createState() => _ToDoItemState();
-}
-
-class _ToDoItemState extends State<ToDoItem> {
-  late DateTime selectedDate;
-
-  @override
-  void initState() {
-    super.initState();
-    selectedDate = widget.initialDate; // Set initial date
-  }
-
-  // Function to open date picker
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: selectedDate, // Current date selected
-      firstDate: DateTime(2020), // The minimum year the user can pick
-      lastDate: DateTime(2101),  // The maximum year the user can pick
-    );
-    if (pickedDate != null && pickedDate != selectedDate)
-      setState(() {
-        selectedDate = pickedDate;
-      });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: Colors.red,
-            radius: 8,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TimerScreen(
+              taskTitle: title,
+              taskDate: initialDate,
+            ),
           ),
-          SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                // Check if the item is the Organic Chemistry Lecture
-                if (widget.title == 'Organic Chemistry Lecture') {
-                  // Navigate to the Timer screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TimerScreen(),
-                    ),
-                  );
-                }
-              },
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.red,
+              radius: 8,
+            ),
+            SizedBox(width: 10),
+            Expanded(
               child: Text(
-                widget.title,
+                title,
                 style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
-          ),
-          // GestureDetector to handle the date click
-          GestureDetector(
-            onTap: () => _selectDate(context),
-            child: Text(
-              DateFormat('EEE, d MMM').format(selectedDate), // Format the date
-              style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.underline),
+            Text(
+              DateFormat('EEE, d MMM').format(initialDate),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                decoration: TextDecoration.underline,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-
-// Stats Section: Daily Streak and Time Spent
+// Other sections remain unchanged (StatsSection, StartStudyingButton, AdvertisementSection)
 class StatsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -243,14 +405,75 @@ class StatsSection extends StatelessWidget {
   }
 }
 
-class DailyStreakSection extends StatelessWidget {
+class DailyStreakSection extends StatefulWidget {
+  @override
+  _DailyStreakSectionState createState() => _DailyStreakSectionState();
+}
+
+class _DailyStreakSectionState extends State<DailyStreakSection> {
+  int streakNumber = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStreakNumber();
+  }
+  Future<void> _fetchStreakNumber() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      try {
+        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+        if (userSnapshot.exists && userSnapshot.data() != null) {
+          Map<String, dynamic> userData = userSnapshot.data() as Map<String, dynamic>;
+
+          DateTime lastStreakUpdate = userData['lastStreakUpdate'] != null
+              ? (userData['lastStreakUpdate'] as Timestamp).toDate()
+              : DateTime.fromMillisecondsSinceEpoch(0);
+
+          DateTime currentTime = DateTime.now();
+          Duration difference = currentTime.difference(lastStreakUpdate);
+
+          // Check if the difference is at least 24 hours
+          if (difference.inHours >= 24) {
+            int newStreakNumber = (userData['streakNumber'] ?? 0) + 1;
+
+            // Update Firestore
+            await FirebaseFirestore.instance.collection('users').doc(userId).update({
+              'streakNumber': newStreakNumber,
+              'lastStreakUpdate': Timestamp.fromDate(currentTime),
+            });
+
+            setState(() {
+              streakNumber = newStreakNumber;
+            });
+          } else {
+            // No streak update if within 24 hours
+            setState(() {
+              streakNumber = userData['streakNumber'] ?? 0;
+            });
+          }
+        }
+      } catch (e) {
+        print('Error fetching streak: $e');
+      }
+    }
+  }
+
+
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'DAILY STREAK: 5 🔥',
+          'DAILY STREAK: $streakNumber 🔥',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -258,8 +481,32 @@ class DailyStreakSection extends StatelessWidget {
         ),
         SizedBox(height: 5),
         Text(
-          '* Streak counter: The streaks increase when a person logs in every consecutive day. It restarts from 0 if a person misses a day.',
+          '* Streak counter: Increases with consecutive daily logins. Resets if a day is missed.',
           style: TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const StatBox({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: Colors.white),
+        ),
+        SizedBox(height: 10),
+        Text(
+          value,
+          style: TextStyle(color: Colors.white),
         ),
       ],
     );
@@ -273,7 +520,7 @@ class TimeSpentSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Time spent on this week: XXh XXmin',
+          'Time spent this week: XXh XXmin',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -281,7 +528,7 @@ class TimeSpentSection extends StatelessWidget {
         ),
         SizedBox(height: 5),
         Text(
-          '* Statistics on time spent on the app',
+          '* Statistics on time spent in the app',
           style: TextStyle(fontSize: 12),
         ),
       ],
@@ -289,7 +536,6 @@ class TimeSpentSection extends StatelessWidget {
   }
 }
 
-// Start Studying Button
 class StartStudyingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -297,11 +543,11 @@ class StartStudyingButton extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xff003039), // Background color
+          backgroundColor: Color(0xff003039),
           padding: EdgeInsets.symmetric(vertical: 16),
         ),
         onPressed: () {
-          // Navigate to the next slide
+          // Handle "Start Studying" button press
         },
         child: Text(
           'START STUDYING',
@@ -312,7 +558,6 @@ class StartStudyingButton extends StatelessWidget {
   }
 }
 
-// Advertisement Section
 class AdvertisementSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -328,3 +573,5 @@ class AdvertisementSection extends StatelessWidget {
     );
   }
 }
+
+

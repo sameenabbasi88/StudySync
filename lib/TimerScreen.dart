@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-
-void main() {
-  runApp(TimerScreen());
-}
+import 'package:intl/intl.dart';
+import 'package:untitled/studysyncmain.dart';
 
 class TimerScreen extends StatefulWidget {
+  final String taskTitle;
+  final DateTime taskDate;
+
+  TimerScreen({required this.taskTitle, required this.taskDate});
+
   @override
   _TimerScreenState createState() => _TimerScreenState();
 }
@@ -15,6 +18,7 @@ class _TimerScreenState extends State<TimerScreen> {
   int _seconds = 0;
   bool _isRunning = false;
   bool _isPaused = false;
+  bool _isCompleted = false; // New state variable
 
   String _formatTime(int seconds) {
     final hours = seconds ~/ 3600;
@@ -23,10 +27,24 @@ class _TimerScreenState extends State<TimerScreen> {
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final day = now.day.toString().padLeft(2, '0');
+    final month = now.month.toString().padLeft(2, '0');
+    final year = now.year;
+    final monthName = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ][now.month - 1];
+
+    return 'Today, $day $monthName $year';
+  }
+
   void _startTimer() {
     setState(() {
       _isRunning = true;
       _isPaused = false;
+      _isCompleted = false; // Reset completion status when starting the timer
     });
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
@@ -55,6 +73,15 @@ class _TimerScreenState extends State<TimerScreen> {
       _isPaused = false;
       _timer.cancel();
       _seconds = 0;
+    });
+  }
+
+  void _completeTask() {
+    setState(() {
+      _isRunning = false;
+      _isPaused = false;
+      _timer.cancel();
+      _isCompleted = true; // Set task as completed
     });
   }
 
@@ -95,7 +122,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Today, 25 August 2024",
+                    _getFormattedDate(),
                     style: TextStyle(fontSize: 18),
                   ),
                 ],
@@ -151,7 +178,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               SizedBox(height: 10),
                               if (_isRunning)
                                 ElevatedButton(
-                                  onPressed: _stopTimer,
+                                  onPressed: _completeTask, // Update to _completeTask
                                   child: Text("Finish"),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
@@ -192,59 +219,33 @@ class _TimerScreenState extends State<TimerScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "TASKS FOR THIS SESSION",
-                                      style: TextStyle(
-                                          fontSize: 18, color: Colors.white),
-                                    ),
-                                    ListTile(
-                                      title: Text(
-                                        "Organic Chemistry Lecture",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      leading: Radio(
-                                        value: 1,
-                                        groupValue: 1,
-                                        onChanged: (value) {},
-                                      ),
-                                    ),
-                                    SizedBox(height: 20),
-                                    Text(
-                                      "Other Uncompleted Tasks",
-                                      style: TextStyle(
-                                          fontSize: 18, color: Colors.white),
-                                    ),
-                                    ListTile(
-                                      title: Text(
-                                        "Economics Essay\nSun, 1 Sep",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      leading: Radio(
-                                        value: 2,
-                                        groupValue: 1,
-                                        onChanged: (value) {},
-                                      ),
-                                    ),
-                                    ListTile(
-                                      title: Text(
-                                        "History Essay\nSun, 1 Sep",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      leading: Radio(
-                                        value: 3,
-                                        groupValue: 1,
-                                        onChanged: (value) {},
-                                      ),
-                                    ),
-                                  ],
+                            Text(
+                              "TASK FOR THIS SESSION",
+                              style: TextStyle(
+                                  fontSize: 18, color: Colors.white),
+                            ),
+                            SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Icon(
+                                  _isCompleted ? Icons.check_circle : Icons.circle_outlined, // Conditional icon
+                                  color: Colors.white,
                                 ),
-                              ),
+                                SizedBox(width: 10),
+                                Text(
+                                  widget.taskTitle,
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              DateFormat('EEE, d MMM').format(widget.taskDate),
+                              style: TextStyle(
+                                  fontSize: 16, color: Colors.white),
                             ),
                           ],
                         ),
@@ -256,22 +257,6 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             AdvertisementSection(),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class AdvertisementSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      color: Colors.grey[300],
-      child: Center(
-        child: Text(
-          'Advertisement',
-          style: TextStyle(fontSize: 18, color: Colors.black),
         ),
       ),
     );
