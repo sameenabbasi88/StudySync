@@ -1,70 +1,81 @@
-import 'dart:io';
-
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 
-void main() {
-  runApp(MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();  // Initialize Firebase
+  runApp(firebase_option());
 }
 
-class MyApp extends StatelessWidget {
+class firebase_option extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: ProfilePage(),
+      home: Scaffold(
+        appBar: AppBar(
+          title: Text('Image Picker Example'),
+        ),
+        body: ImagePickerWidget(),
+      ),
     );
   }
 }
 
-class ProfilePage extends StatefulWidget {
+class ImagePickerWidget extends StatefulWidget {
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  _ImagePickerWidgetState createState() => _ImagePickerWidgetState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  File? _image;
-
-  final ImagePicker _picker = ImagePicker();
+class _ImagePickerWidgetState extends State<ImagePickerWidget> {
+  Uint8List? _imageData;
+  String? _imageUrl;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   Future<void> _pickImage() async {
-    // Use pickImage instead of getImage
-    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
 
-    setState(() {
-      if (pickedFile != null) {
-        _image = File(pickedFile.path);
+    if (result != null && result.files.single.bytes != null) {
+      Uint8List imageData = result.files.single.bytes!;
+
+      // Upload image to Firebase Storage
+      try {
+        final ref = _storage.ref().child('uploads/${DateTime.now().millisecondsSinceEpoch}.png');
+        await ref.putData(imageData);
+
+        // Get the download URL and set it to display the image
+        final url = await ref.getDownloadURL();
+        setState(() {
+          _imageData = imageData;
+          _imageUrl = url;
+        });
+      } catch (e) {
+        print("Error uploading image: $e");
       }
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Profile Page'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[200],
-                backgroundImage: _image != null
-                    ? FileImage(_image!)
-                    : AssetImage('assets/images/bg.jpg') as ImageProvider,
-              ),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Tap the icon to change the profile picture',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _imageUrl != null
+              ? Image.network(_imageUrl!)
+              : Text('No image selected'),
+          SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _pickImage,
+            child: Text('Pick Image'),
+          ),
+        ],
       ),
     );
   }
 }
+

@@ -43,6 +43,11 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Group ID is empty');
     }
   }
+  void _updateTaskList(Task task) {
+    setState(() {
+      tasks = tasks.where((t) => t.taskName != task.taskName).toList();
+    });
+  }
 
   Future<void> _fetchGroupDetails() async {
     try {
@@ -215,6 +220,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                   ),
                 ),
               ),
+
             ],
           ),
         ),
@@ -242,6 +248,12 @@ class _TaskManagerState extends State<TaskManager> {
   void initState() {
     super.initState();
     taskNames = widget.tasks.map((task) => task.taskName).toList();
+  }
+
+  void _handleTaskDeletion(String task) {
+    setState(() {
+      taskNames.remove(task);
+    });
   }
 
   Future<void> _addTaskToFirestore(String taskName) async {
@@ -339,7 +351,11 @@ class _TaskManagerState extends State<TaskManager> {
             ],
           ),
           SizedBox(height: 20),
-          ...taskNames.map((task) => TaskPopupItem(task: task)).toList(),
+          ...taskNames.map((task) => TaskPopupItem(
+            task: task,
+            groupId: widget.groupId,
+            onTaskDeleted: _handleTaskDeletion,
+          )).toList(),
           SizedBox(height: 20),
           Align(
             alignment: Alignment.bottomRight,
@@ -355,10 +371,58 @@ class _TaskManagerState extends State<TaskManager> {
   }
 }
 
+
 class TaskPopupItem extends StatelessWidget {
   final String task;
+  final String groupId;
+  final ValueChanged<String> onTaskDeleted;
 
-  TaskPopupItem({required this.task});
+  TaskPopupItem({
+    required this.task,
+    required this.groupId,
+    required this.onTaskDeleted,
+  });
+
+  void _deleteTask(BuildContext context) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Task'),
+          content: Text('Do you really want to delete this task?'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Delete'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(groupId);
+        await groupDoc.update({
+          'tasks': FieldValue.arrayRemove([
+            {
+              'task': task,
+              'progress': 0.0, // Ensure this matches the initial progress value
+            }
+          ]),
+        });
+
+        // Notify the parent to update the UI
+        onTaskDeleted(task);
+      } catch (e) {
+        print('Error deleting task: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -375,9 +439,7 @@ class TaskPopupItem extends StatelessWidget {
             style: TextStyle(fontSize: 16),
           ),
           trailing: GestureDetector(
-            onTap: () {
-              // Add functionality for deleting task
-            },
+            onTap: () => _deleteTask(context),
             child: CircleAvatar(
               backgroundColor: Colors.red,
               child: Icon(
@@ -391,6 +453,7 @@ class TaskPopupItem extends StatelessWidget {
     );
   }
 }
+
 
 class Task {
   final String taskName;

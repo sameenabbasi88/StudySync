@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -60,10 +61,13 @@ class _ProfilePageState extends State<ProfilePage> {
           DateTime joinedDate = timestamp.toDate();
           String formattedDate = DateFormat('yyyy-MM-dd').format(joinedDate);
 
+          // Fetch the profile photo URL if it exists, otherwise use a placeholder
+          String profilePhotoUrl = userDoc['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+
           setState(() {
             _usernameController.text = userDoc['username'];
             _joinedDateController.text = 'Joined: $formattedDate';
-            _profilePhotoUrl = userDoc['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+            _profilePhotoUrl = profilePhotoUrl;
           });
         }
       }
@@ -72,82 +76,25 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _fetchAddedFriends() async {
+  Future<void> _updateUserProfile() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        final email = currentUser.email;
-        final doc = await FirebaseFirestore.instance.collection('friends').doc(email).get();
-        if (doc.exists) {
-          setState(() {
-            addedFriends = List<String>.from(doc['fname'] ?? []);
-          });
-        }
+        final userDoc = FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid);
+
+        await userDoc.update({
+          'username': _usernameController.text,
+          'groups': _groupsController.text,
+          'favoriteSubject': _favoriteSubjectController.text,
+        });
+
+        // Fetch and update profile photo URL if needed
+        // await _updateProfilePhotoUrl(_profilePhotoUrl); // Uncomment if you have a separate profile photo URL update function
       }
-    } catch (error) {
-      print('Error fetching added friends: $error');
-    }
-  }
-
-  Future<void> _pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      try {
-        if (kIsWeb) {
-          final bytes = await pickedFile.readAsBytes();
-          final Uint8List imageData = Uint8List.fromList(bytes);
-
-          final storageRef = FirebaseStorage.instance
-              .ref()
-              .child('profile_photos/${FirebaseAuth.instance.currentUser!.uid}.jpg');
-
-          final uploadTask = storageRef.putData(imageData);
-          final snapshot = await uploadTask;
-          String imageUrl = await snapshot.ref.getDownloadURL();
-          await _updateProfilePhotoUrl(imageUrl);
-          setState(() {
-            _profilePhotoUrl = imageUrl;
-          });
-        } else {
-          File imageFile = File(pickedFile.path);
-          String imageUrl = await _uploadImage(imageFile);
-          if (imageUrl.isNotEmpty) {
-            await _updateProfilePhotoUrl(imageUrl);
-            setState(() {
-              _profilePhotoUrl = imageUrl;
-            });
-          }
-        }
-      } catch (e) {
-        print('Error uploading image: $e');
-      }
-    }
-  }
-
-  Future<String> _uploadImage(File image) async {
-    try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_photos/${FirebaseAuth.instance.currentUser!.uid}.jpg');
-      final uploadTask = storageRef.putFile(image);
-      final snapshot = await uploadTask;
-      return await snapshot.ref.getDownloadURL();
     } catch (e) {
-      print('Error uploading image: $e');
-      return '';
-    }
-  }
-
-  Future<void> _updateProfilePhotoUrl(String photoUrl) async {
-    try {
-      final userDoc = FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid);
-      await userDoc.update({'profilePhotoUrl': photoUrl});
-    } catch (e) {
-      print('Error updating profile photo URL: $e');
+      print('Error updating user profile: $e');
     }
   }
 
@@ -182,7 +129,8 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () {
-                setState(() {}); // Save changes
+                _updateUserProfile(); // Save changes to Firestore
+                setState(() {}); // Refresh the state
                 Navigator.of(context).pop();
               },
               child: Text('Save'),
@@ -198,6 +146,124 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     );
   }
+
+  Future<void> _fetchAddedFriends() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final email = currentUser.email;
+        final doc = await FirebaseFirestore.instance.collection('friends').doc(email).get();
+        if (doc.exists) {
+          setState(() {
+            addedFriends = List<String>.from(doc['fname'] ?? []);
+          });
+        }
+      }
+    } catch (error) {
+      print('Error fetching added friends: $error');
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        final imageData = result.files.single.bytes!;
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('profile_photos/${FirebaseAuth.instance.currentUser!.uid}.jpg');
+
+        final uploadTask = storageRef.putData(imageData);
+        final snapshot = await uploadTask;
+        String imageUrl = await snapshot.ref.getDownloadURL();
+
+        await _updateProfilePhotoUrl(imageUrl);
+
+        setState(() {
+          _profilePhotoUrl = imageUrl;
+        });
+      }
+    } catch (e) {
+      print('Error picking or uploading image: $e');
+    }
+  }
+
+
+  Future<String> _uploadImage(File image) async {
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos/${FirebaseAuth.instance.currentUser!.uid}.jpg');
+      final uploadTask = storageRef.putFile(image);
+      final snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading image: $e');
+      return '';
+    }
+  }
+
+  Future<void> _updateProfilePhotoUrl(String photoUrl) async {
+    try {
+      final userDoc = FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid);
+      await userDoc.update({'profilePhotoUrl': photoUrl});
+    } catch (e) {
+      print('Error updating profile photo URL: $e');
+    }
+  }
+  //
+  // void _editProfile() {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) {
+  //       return AlertDialog(
+  //         title: Text('Edit Profile'),
+  //         content: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             TextField(
+  //               controller: _usernameController,
+  //               decoration: InputDecoration(labelText: 'Username'),
+  //             ),
+  //             TextField(
+  //               controller: _joinedDateController,
+  //               decoration: InputDecoration(labelText: 'Joined Date'),
+  //               enabled: false,
+  //             ),
+  //             TextField(
+  //               controller: _groupsController,
+  //               decoration: InputDecoration(labelText: 'Groups'),
+  //             ),
+  //             TextField(
+  //               controller: _favoriteSubjectController,
+  //               decoration: InputDecoration(labelText: 'Favorite Subject'),
+  //             ),
+  //           ],
+  //         ),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () {
+  //               setState(() {}); // Save changes
+  //               Navigator.of(context).pop();
+  //             },
+  //             child: Text('Save'),
+  //           ),
+  //           TextButton(
+  //             onPressed: () {
+  //               Navigator.of(context).pop();
+  //             },
+  //             child: Text('Cancel'),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +291,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: Padding(
                           padding: EdgeInsets.all(8.0),
                           child:GestureDetector(
-                            onTap: _pickAndUploadImage, // Tap to pick and upload image
+                            onTap: _pickAndUploadImage,
                             child: Stack(
                               children: [
                                 Container(
@@ -234,14 +300,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey[300],
                                     shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.person, // Profile icon
-                                    size: 60,
-                                    color: Colors.grey[600],
+                                    image: DecorationImage(
+                                      image: NetworkImage(_profilePhotoUrl), // Always use _profilePhotoUrl
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
-
                               ],
                             ),
                           ),

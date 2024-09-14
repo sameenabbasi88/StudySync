@@ -33,7 +33,9 @@ class _GroupsPageState extends State<GroupsPage> {
   List<String> addedFriends = [];
   Color selectedColor = Colors.red; // Default selected color for group
   TextEditingController groupNameController = TextEditingController();
+  TextEditingController searchController = TextEditingController(); // Controller for search
   String? selectedGroup;
+  String searchQuery = ''; // Variable to hold search query
 
   @override
   void initState() {
@@ -59,33 +61,50 @@ class _GroupsPageState extends State<GroupsPage> {
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text(
-              'Groups and Friends',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.teal,
-              ),
-            ),
-            SizedBox(height: 16),
             Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Color(0xff003039),
-                        borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xff003039),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Groups and Friends',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal,
                       ),
+                    ),
+                    SizedBox(height: 16),
+                    // Search Bar within the groups container
+                    TextField(
+                      controller: searchController,
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value.toLowerCase();
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Search groups',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Expanded(
                       child: selectedGroup == null
                           ? StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('groups')
-                            .snapshots(),
+                        stream: FirebaseFirestore.instance.collection('groups').snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return Center(child: CircularProgressIndicator());
@@ -97,7 +116,13 @@ class _GroupsPageState extends State<GroupsPage> {
                             return Center(child: Text('No groups found'));
                           }
 
-                          final groups = snapshot.data!.docs;
+                          final groups = snapshot.data!.docs
+                              .where((doc) {
+                            final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
+                            return groupName.contains(searchQuery);
+                          })
+                              .toList();
+
                           return GridView.builder(
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
@@ -122,60 +147,60 @@ class _GroupsPageState extends State<GroupsPage> {
                       )
                           : TaskManagerApp(groupId: selectedGroup!), // Display TaskManagerApp if a group is selected
                     ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Color(0xff003039),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Added Friends (${addedFriends.length})',  // Display number of added friends
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Expanded(
-                            child: addedFriends.isEmpty
-                                ? Center(
-                              child: Text(
-                                'No friends added',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            )
-                                : ListView.builder(
-                              itemCount: addedFriends.length,
-                              itemBuilder: (context, index) {
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    child: Icon(Icons.person, color: Colors.white),
-                                    backgroundColor: Colors.blue,
-                                  ),
-                                  title: Text(
-                                    addedFriends[index],
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xff003039),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Added Friends (${addedFriends.length})',  // Display number of added friends
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 8),
+                    Expanded(
+                      child: addedFriends.isEmpty
+                          ? Center(
+                        child: Text(
+                          'No friends added',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                          : ListView.builder(
+                        itemCount: addedFriends.length,
+                        itemBuilder: (context, index) {
+                          return ListTile(
+                            leading: CircleAvatar(
+                              child: Icon(Icons.person, color: Colors.white),
+                              backgroundColor: Colors.blue,
+                            ),
+                            title: Text(
+                              addedFriends[index],
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -371,5 +396,5 @@ class _GroupsPageState extends State<GroupsPage> {
       print('Error adding group: $e');
     }
   }
-
 }
+

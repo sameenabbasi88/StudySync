@@ -2,9 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Add Firestore import
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:untitled/studysyncmain.dart';
-
 import 'SignupPage.dart';
 
 Future<void> main() async {
@@ -49,8 +48,51 @@ class StudySyncLoginPage extends StatefulWidget {
 class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final FirebaseFirestore _firestore = FirebaseFirestore
-      .instance; // Firestore instance
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Method to log session start
+  Future<void> logSessionStart(String userId) async {
+    String sessionId = DateTime.now().toIso8601String();
+    await _firestore.collection('sessionLogs').add({
+      'userId': userId,
+      'startTime': Timestamp.now(),
+      'endTime': null,
+      'sessionId': sessionId,
+    });
+  }
+
+  // Method to log session end
+  Future<void> logSessionEnd(String userId) async {
+    try {
+      // Fetch the last session where endTime is null and update it
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('sessionLogs')
+          .where('userId', isEqualTo: userId)
+          .where('endTime', isEqualTo: null)
+          .orderBy('startTime', descending: true)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        DocumentSnapshot lastSession = querySnapshot.docs.first;
+        print("Updating session with ID: ${lastSession.id}");
+        await lastSession.reference.update({'endTime': Timestamp.now()});
+      } else {
+        print("No active session found for user: $userId");
+      }
+    } catch (e) {
+      print("Error updating session end time: $e");
+    }
+  }
+
+  // Method to sign out
+  Future<void> signOut() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await logSessionEnd(user.uid);
+    }
+    await FirebaseAuth.instance.signOut();
+  }
 
   Future<void> _signIn() async {
     try {
@@ -66,8 +108,10 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
         // Update last login timestamp
         await _firestore.collection('users').doc(user.uid).update({
           'lastLogin': FieldValue.serverTimestamp(),
-          // Store the server timestamp
         });
+
+        // Log the session start
+        await logSessionStart(user.uid);
 
         // Navigate to StudySyncMainPage
         Navigator.pushReplacement(
@@ -95,7 +139,7 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: SingleChildScrollView( // Added SingleChildScrollView
+              child: SingleChildScrollView(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +213,6 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: 20),
                               ElevatedButton(
                                 onPressed: _signIn,
@@ -215,6 +258,19 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      logSessionEnd(user.uid).then((_) {
+        print("Session ended for user: ${user.uid}");
+      }).catchError((e) {
+        print("Error ending session: $e");
+      });
+    }
+    super.dispose();
+  }
 }
 
 class ForgotPasswordDialog extends StatelessWidget {
@@ -239,7 +295,6 @@ class ForgotPasswordDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -263,8 +318,6 @@ class ForgotPasswordDialog extends StatelessWidget {
                     ),
                   ],
                 ),
-
-                // Email Input Field
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -282,37 +335,36 @@ class ForgotPasswordDialog extends StatelessWidget {
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      'A password reset link will be sent to the email entered.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
+                        hintText: 'Enter your email',
                       ),
                     ),
                   ],
                 ),
-
-                // Send Email Button
-                ElevatedButton(
-                  onPressed: () async {
-                    String email = emailController.text;
-                    try {
-                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                      // Close the dialog after a short delay
-                      Future.delayed(Duration(seconds: 1), () {
-                        Navigator.of(context).pop();
-                      });
-                    } catch (e) {
-                      // Handle errors here if needed, but no SnackBar
-                    }
-                  },
-                  child: Text('Send Email', style: TextStyle(color: Colors.black87)),
-                )
+                SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Call reset password logic
+                          try {
+                            await FirebaseAuth.instance
+                                .sendPasswordResetEmail(
+                              email: emailController.text,
+                            );
+                            Navigator.of(dialogContext).pop(); // Close dialog
+                          } catch (e) {
+                            // Handle error
+                            print("Error sending password reset email: $e");
+                          }
+                        },
+                        child: Text('Reset Password'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           );
@@ -321,6 +373,3 @@ class ForgotPasswordDialog extends StatelessWidget {
     );
   }
 }
-
-
-

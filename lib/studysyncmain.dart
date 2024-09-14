@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:untitled/GroupsPage.dart';
 import 'package:untitled/ProfilePage.dart';
+import 'package:untitled/firebase_options.dart';
 
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
@@ -22,6 +23,52 @@ class StudySyncDashboard extends StatefulWidget {
 
 class _StudySyncDashboardState extends State<StudySyncDashboard> {
   String selectedSection = 'studysync'; // Default section
+  Duration totalTimeSpentThisWeek = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateTimeSpentThisWeek(); // Call function to calculate time spent
+  }
+
+  // Fetch session data and calculate total time spent this week
+  Future<void> _calculateTimeSpentThisWeek() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      // Get the current date
+      DateTime now = DateTime.now();
+      DateTime startOfWeek = now.subtract(
+          Duration(days: now.weekday - 1)); // Start of the week (Monday)
+
+      // Query Firestore for sessions in the current week
+      QuerySnapshot sessionSnapshot = await FirebaseFirestore.instance
+          .collection('sessionLogs')
+          .where('userId', isEqualTo: userId)
+          .where(
+          'startTime', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+          .get();
+
+      // Initialize total time spent to 0
+      Duration totalSpent = Duration.zero;
+
+      // Loop through the sessions and calculate time spent
+      sessionSnapshot.docs.forEach((doc) {
+        Map<String, dynamic> sessionData = doc.data() as Map<String, dynamic>;
+        DateTime startTime = (sessionData['startTime'] as Timestamp).toDate();
+        DateTime endTime = (sessionData['endTime'] as Timestamp).toDate();
+
+        Duration sessionDuration = endTime.difference(startTime);
+        totalSpent += sessionDuration;
+      });
+
+      // Update the state with the total time spent
+      setState(() {
+        totalTimeSpentThisWeek = totalSpent;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,23 +97,25 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
                       if (selectedSection == 'studysync') ...[
                         Expanded(flex: 2, child: ToDoSection()),
                         SizedBox(width: 20),
-                        Expanded(flex: 3, child: StatsSection()),
-                      ] else if (selectedSection == 'friends') ...[
-                        Expanded(child: FriendsPage()),
-                      ] else if (selectedSection == 'groups') ...[
-                        Expanded(child: GroupsPage()),
-                      ] else if (selectedSection == 'profile') ...[
-                        Expanded(child: ProfilePage()),
-                      ],
+                        Expanded(flex: 3, child: StatsSection(
+                            totalTimeSpentThisWeek: totalTimeSpentThisWeek)),
+                      ] else
+                        if (selectedSection == 'friends') ...[
+                          Expanded(child: FriendsPage()),
+                        ] else
+                          if (selectedSection == 'groups') ...[
+                            Expanded(child: GroupsPage()),
+                          ] else
+                            if (selectedSection == 'profile') ...[
+                              Expanded(child: ProfilePage()),
+                            ],
                     ],
                   ),
                 ),
                 SizedBox(height: 20),
 
-                // Conditional "Start Studying" button and advertisement
+                // Conditional advertisement section
                 if (selectedSection == 'studysync') ...[
-                  StartStudyingButton(),
-                  SizedBox(height: 10),
                   AdvertisementSection(),
                 ],
               ],
@@ -146,7 +195,6 @@ class HeaderLink extends StatelessWidget {
   }
 }
 
-
 // TO-DO Section
 class ToDoSection extends StatefulWidget {
   @override
@@ -162,13 +210,11 @@ class _ToDoSectionState extends State<ToDoSection> {
     _fetchTodoItems();
   }
 
-  // Function to fetch items from the database
   void _fetchTodoItems() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
     String userId = currentUser?.uid ?? '';
 
     if (userId.isNotEmpty) {
-      // Fetch the user's todo items from the database
       DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
           .collection('todoTasks')
           .doc(userId)
@@ -186,12 +232,10 @@ class _ToDoSectionState extends State<ToDoSection> {
         });
       }
     } else {
-      // Handle case where user is not logged in
       print('No user is logged in.');
     }
   }
 
-  // Function to show the add item dialog
   void _showAddItemDialog() {
     TextEditingController taskController = TextEditingController();
     DateTime selectedDate = DateTime.now();
@@ -257,7 +301,6 @@ class _ToDoSectionState extends State<ToDoSection> {
     );
   }
 
-  // Function to add item to the list and store it in the database
   void _addTodoItem(String title, DateTime date) async {
     if (title.isNotEmpty) {
       User? currentUser = FirebaseAuth.instance.currentUser;
@@ -268,7 +311,6 @@ class _ToDoSectionState extends State<ToDoSection> {
           todoList.add({'title': title, 'date': date});
         });
 
-        // Use set with merge: true to avoid the not-found error if the document doesn't exist
         await FirebaseFirestore.instance
             .collection('todoTasks')
             .doc(userId)
@@ -339,43 +381,85 @@ class _ToDoSectionState extends State<ToDoSection> {
   }
 }
 
-
 class ToDoItem extends StatelessWidget {
   final String title;
   final DateTime initialDate;
 
   const ToDoItem({required this.title, required this.initialDate});
 
+  void _updateDate(BuildContext context, DateTime newDate) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      // Update the date in Firestore
+      await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+        'Todotasks': FieldValue.arrayUnion([
+          {
+            'title': title,
+            'date': newDate.toIso8601String()
+          }
+        ]),
+      });
+
+      // Optionally remove the old date
+      await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+        'Todotasks': FieldValue.arrayRemove([
+          {
+            'title': title,
+            'date': initialDate.toIso8601String()
+          }
+        ]),
+      });
+    } else {
+      print('No user is logged in.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TimerScreen(
-              taskTitle: title,
-              taskDate: initialDate,
-            ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10.0),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.red,
+            radius: 8,
           ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10.0),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.red,
-              radius: 8,
-            ),
-            SizedBox(width: 10),
-            Expanded(
+          SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TimerScreen(
+                      taskTitle: title,
+                      taskDate: initialDate,
+                    ),
+                  ),
+                );
+              },
               child: Text(
                 title,
                 style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
-            Text(
+          ),
+          GestureDetector(
+            onTap: () async {
+              DateTime? pickedDate = await showDatePicker(
+                context: context,
+                initialDate: initialDate,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2101),
+              );
+              if (pickedDate != null && pickedDate != initialDate) {
+                _updateDate(context, pickedDate);
+                // You may need to refresh the list or update the state accordingly
+              }
+            },
+            child: Text(
               DateFormat('EEE, d MMM').format(initialDate),
               style: TextStyle(
                 color: Colors.white,
@@ -383,15 +467,19 @@ class ToDoItem extends StatelessWidget {
                 decoration: TextDecoration.underline,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// Other sections remain unchanged (StatsSection, StartStudyingButton, AdvertisementSection)
+
 class StatsSection extends StatelessWidget {
+  final Duration totalTimeSpentThisWeek;
+
+  StatsSection({required this.totalTimeSpentThisWeek}); // Make sure this is passed
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -399,7 +487,9 @@ class StatsSection extends StatelessWidget {
       children: [
         DailyStreakSection(),
         SizedBox(height: 30),
-        TimeSpentSection(),
+        TimeSpentSection(totalTimeSpentThisWeek: totalTimeSpentThisWeek), // Pass actual value here
+        SizedBox(height: 20),
+        StartStudyingButton(), // Add the button here
       ],
     );
   }
@@ -514,13 +604,19 @@ class StatBox extends StatelessWidget {
 }
 
 class TimeSpentSection extends StatelessWidget {
+  final Duration totalTimeSpentThisWeek;
+
+  TimeSpentSection({required this.totalTimeSpentThisWeek});
+
   @override
   Widget build(BuildContext context) {
+    String formattedTimeSpent = _formatDuration(totalTimeSpentThisWeek);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Time spent this week: XXh XXmin',
+          'Time spent this week: $formattedTimeSpent',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -533,6 +629,13 @@ class TimeSpentSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  // Helper function to format Duration into hours and minutes
+  String _formatDuration(Duration duration) {
+    int hours = duration.inHours;
+    int minutes = duration.inMinutes.remainder(60);
+    return '${hours}h ${minutes}min';
   }
 }
 
@@ -547,7 +650,12 @@ class StartStudyingButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 16),
         ),
         onPressed: () {
-          // Handle "Start Studying" button press
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>firebase_option()
+            ),
+          );
         },
         child: Text(
           'START STUDYING',
