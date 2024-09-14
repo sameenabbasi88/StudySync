@@ -216,54 +216,6 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error updating profile photo URL: $e');
     }
   }
-  //
-  // void _editProfile() {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) {
-  //       return AlertDialog(
-  //         title: Text('Edit Profile'),
-  //         content: Column(
-  //           mainAxisSize: MainAxisSize.min,
-  //           children: [
-  //             TextField(
-  //               controller: _usernameController,
-  //               decoration: InputDecoration(labelText: 'Username'),
-  //             ),
-  //             TextField(
-  //               controller: _joinedDateController,
-  //               decoration: InputDecoration(labelText: 'Joined Date'),
-  //               enabled: false,
-  //             ),
-  //             TextField(
-  //               controller: _groupsController,
-  //               decoration: InputDecoration(labelText: 'Groups'),
-  //             ),
-  //             TextField(
-  //               controller: _favoriteSubjectController,
-  //               decoration: InputDecoration(labelText: 'Favorite Subject'),
-  //             ),
-  //           ],
-  //         ),
-  //         actions: [
-  //           TextButton(
-  //             onPressed: () {
-  //               setState(() {}); // Save changes
-  //               Navigator.of(context).pop();
-  //             },
-  //             child: Text('Save'),
-  //           ),
-  //           TextButton(
-  //             onPressed: () {
-  //               Navigator.of(context).pop();
-  //             },
-  //             child: Text('Cancel'),
-  //           ),
-  //         ],
-  //       );
-  //     },
-  //   );
-  // }
 
   @override
   Widget build(BuildContext context) {

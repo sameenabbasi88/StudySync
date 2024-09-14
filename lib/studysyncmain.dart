@@ -1,12 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:untitled/GroupsPage.dart';
 import 'package:untitled/ProfilePage.dart';
-import 'package:untitled/firebase_options.dart';
-
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 
@@ -650,12 +647,12 @@ class StartStudyingButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 16),
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>firebase_option()
-            ),
-          );
+          // Navigator.push(
+          //   context,
+          //   MaterialPageRoute(
+          //     builder: (context) =>
+          //   ),
+          // );
         },
         child: Text(
           'START STUDYING',
