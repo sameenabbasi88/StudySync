@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:untitled/GroupsPage.dart';
 import 'package:untitled/ProfilePage.dart';
+import 'package:untitled/StartStudyingPage.dart';
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 
@@ -165,6 +166,7 @@ class HeaderSection extends StatelessWidget {
     );
   }
 }
+
 class HeaderLink extends StatelessWidget {
   final String text;
   final Function(String) onLinkPressed;
@@ -198,7 +200,6 @@ class HeaderLink extends StatelessWidget {
     );
   }
 }
-
 // TO-DO Section
 class ToDoSection extends StatefulWidget {
   @override
@@ -231,102 +232,19 @@ class _ToDoSectionState extends State<ToDoSection> {
             return {
               'title': task['title'],
               'date': DateTime.parse(task['date']),
+              'priority': task['priority'] ?? 0, // Default priority to 0 if not present
             };
-          }).toList();
+          }).toList()
+            ..sort((a, b) {
+              // Sort by priority first (ascending), then by date (ascending)
+              int priorityComparison = a['priority'].compareTo(b['priority']);
+              if (priorityComparison != 0) return priorityComparison;
+              return a['date'].compareTo(b['date']);
+            });
         });
       }
     } else {
       print('No user is logged in.');
-    }
-  }
-
-  void _showAddItemDialog() {
-    TextEditingController taskController = TextEditingController();
-    DateTime selectedDate = DateTime.now();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text("Add To-Do Item"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: taskController,
-                    decoration: InputDecoration(hintText: "Task Name"),
-                  ),
-                  SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2101),
-                      );
-                      if (pickedDate != null && pickedDate != selectedDate) {
-                        setState(() {
-                          selectedDate = pickedDate;
-                        });
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today),
-                        SizedBox(width: 10),
-                        Text(DateFormat('EEE, d MMM').format(selectedDate)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  child: Text("Cancel"),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                TextButton(
-                  child: Text("Add"),
-                  onPressed: () {
-                    _addTodoItem(taskController.text, selectedDate);
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _addTodoItem(String title, DateTime date) async {
-    if (title.isNotEmpty) {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      String userId = currentUser?.uid ?? '';
-
-      if (userId.isNotEmpty) {
-        setState(() {
-          todoList.add({'title': title, 'date': date});
-        });
-
-        await FirebaseFirestore.instance
-            .collection('todoTasks')
-            .doc(userId)
-            .set({
-          'Todotasks': FieldValue.arrayUnion([{
-            'title': title,
-            'date': date.toIso8601String()
-          }])
-        }, SetOptions(merge: true));
-      } else {
-        print('No user is logged in.');
-      }
     }
   }
 
@@ -361,29 +279,14 @@ class _ToDoSectionState extends State<ToDoSection> {
               },
             ),
           ),
-          SizedBox(height: 10),
-          GestureDetector(
-            onTap: _showAddItemDialog,
-            child: Row(
-              children: [
-                Icon(Icons.add_circle, color: Colors.white),
-                SizedBox(width: 20),
-                Text(
-                  'Add Item',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 }
+
+
+
 
 class ToDoItem extends StatelessWidget {
   final String title;
@@ -477,7 +380,6 @@ class ToDoItem extends StatelessWidget {
     );
   }
 }
-
 
 class StatsSection extends StatelessWidget {
   final Duration totalTimeSpentThisWeek;
@@ -654,12 +556,12 @@ class StartStudyingButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 16),
         ),
         onPressed: () {
-          // Navigator.push(
-          //   context,
-          //   MaterialPageRoute(
-          //     builder: (context) =>
-          //   ),
-          // );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CalendarToDoPage()
+            ),
+          );
         },
         child: Text(
           'START STUDYING',

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:untitled/studysyncmain.dart';
@@ -22,7 +24,14 @@ class _TimerScreenState extends State<TimerScreen> {
   int _seconds = 0;
   bool _isRunning = false;
   bool _isPaused = false;
-  bool _isCompleted = false; // New state variable
+  bool _isCompleted = false;
+  List<Map<String, dynamic>> uncompletedTasks = []; // Store uncompleted tasks
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUncompletedTasks(); // Fetch uncompleted tasks when the screen loads
+  }
 
   @override
   void dispose() {
@@ -30,6 +39,34 @@ class _TimerScreenState extends State<TimerScreen> {
     super.dispose();
   }
 
+  // Fetch uncompleted tasks from Firebase Firestore
+  void _fetchUncompletedTasks() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId)
+          .get();
+
+      if (docSnapshot.exists) {
+        List<dynamic> tasks = docSnapshot.get('Todotasks') ?? [];
+        setState(() {
+          uncompletedTasks = tasks
+              .map((task) => {
+            'title': task['title'],
+            'date': DateTime.parse(task['date']),
+          })
+              .toList()
+              .where((task) => task['title'] != widget.taskTitle) // Exclude the current task
+              .toList();
+        });
+      }
+    }
+  }
+
+  // Timer logic remains the same
   String _formatTime(int seconds) {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
@@ -49,6 +86,8 @@ class _TimerScreenState extends State<TimerScreen> {
 
     return 'Today, $day $monthName $year';
   }
+
+
 
   void _startTimer() {
     setState(() {
@@ -113,16 +152,13 @@ class _TimerScreenState extends State<TimerScreen> {
     return Scaffold(
       body: Column(
         children: [
-          HeaderSection(onLinkPressed: _handleLinkPress), // Use HeaderSection here
+          HeaderSection(onLinkPressed: _handleLinkPress),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _getFormattedDate(),
-                  style: TextStyle(fontSize: 18),
-                ),
+                Text(_getFormattedDate(), style: TextStyle(fontSize: 18)),
               ],
             ),
           ),
@@ -181,24 +217,6 @@ class _TimerScreenState extends State<TimerScreen> {
                                   backgroundColor: Colors.white,
                                 ),
                               ),
-                            SizedBox(height: 10),
-                            Text(
-                              "Timer is default",
-                              style: TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                            SizedBox(height: 10),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _seconds = 0; // Reset seconds
-                                });
-                                _startTimer();
-                              },
-                              child: Text(
-                                "TIMER | STOPWATCH | POMODORO",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -225,7 +243,7 @@ class _TimerScreenState extends State<TimerScreen> {
                           Row(
                             children: [
                               Icon(
-                                _isCompleted ? Icons.check_circle : Icons.circle_outlined, // Conditional icon
+                                _isCompleted ? Icons.check_circle : Icons.circle_outlined,
                                 color: Colors.white,
                               ),
                               SizedBox(width: 10),
@@ -239,6 +257,35 @@ class _TimerScreenState extends State<TimerScreen> {
                           Text(
                             DateFormat('EEE, d MMM').format(widget.taskDate),
                             style: TextStyle(fontSize: 16, color: Colors.white),
+                          ),
+                          SizedBox(height: 20),
+                          // Uncompleted Tasks Section
+                          Text(
+                            "UNCOMPLETED TASKS",
+                            style: TextStyle(fontSize: 18, color: Colors.white),
+                          ),
+                          SizedBox(height: 10),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: uncompletedTasks.length,
+                              itemBuilder: (context, index) {
+                                final task = uncompletedTasks[index];
+                                return ListTile(
+                                  leading: Icon(Icons.circle_outlined, color: Colors.white),
+                                  title: Text(
+                                    task['title'],
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  subtitle: Text(
+                                    DateFormat('EEE, d MMM').format(task['date']),
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  onTap: () {
+                                    // Optionally, navigate to this task's timer screen
+                                  },
+                                );
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -254,3 +301,4 @@ class _TimerScreenState extends State<TimerScreen> {
     );
   }
 }
+

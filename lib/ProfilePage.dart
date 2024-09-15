@@ -68,6 +68,7 @@ class _ProfilePageState extends State<ProfilePage> {
             _usernameController.text = userDoc['username'];
             _joinedDateController.text = 'Joined: $formattedDate';
             _profilePhotoUrl = profilePhotoUrl;
+            _favoriteSubjectController.text = userDoc['favoriteSubject'] ?? ''; // Fetch the favorite subject
           });
         }
       }
@@ -75,6 +76,7 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error fetching user profile: $error');
     }
   }
+
 
   Future<void> _updateUserProfile() async {
     try {
