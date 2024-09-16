@@ -1,9 +1,10 @@
+import 'dart:html' as html; // Import for handling browser events
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:untitled/studysyncmain.dart';
+import 'package:untitled/views/studysyncmain.dart';
 import 'SignupPage.dart';
 
 Future<void> main() async {
@@ -45,54 +46,27 @@ class StudySyncLoginPage extends StatefulWidget {
   _StudySyncLoginPageState createState() => _StudySyncLoginPageState();
 }
 
-class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
+class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBindingObserver {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _sessionId; // Store the current session ID
+  User? currentUser;
 
-  // Method to log session start
-  Future<void> logSessionStart(String userId) async {
-    String sessionId = DateTime.now().toIso8601String();
-    await _firestore.collection('sessionLogs').add({
-      'userId': userId,
-      'startTime': Timestamp.now(),
-      'endTime': null,
-      'sessionId': sessionId,
-    });
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    currentUser = FirebaseAuth.instance.currentUser;
+
   }
 
-  // Method to log session end
-  Future<void> logSessionEnd(String userId) async {
-    try {
-      // Fetch the last session where endTime is null and update it
-      QuerySnapshot querySnapshot = await _firestore
-          .collection('sessionLogs')
-          .where('userId', isEqualTo: userId)
-          .where('endTime', isEqualTo: null)
-          .orderBy('startTime', descending: true)
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        DocumentSnapshot lastSession = querySnapshot.docs.first;
-        print("Updating session with ID: ${lastSession.id}");
-        await lastSession.reference.update({'endTime': Timestamp.now()});
-      } else {
-        print("No active session found for user: $userId");
-      }
-    } catch (e) {
-      print("Error updating session end time: $e");
-    }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
-  // Method to sign out
-  Future<void> signOut() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await logSessionEnd(user.uid);
-    }
-    await FirebaseAuth.instance.signOut();
-  }
 
   Future<void> _signIn() async {
     try {
@@ -109,9 +83,7 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
         await _firestore.collection('users').doc(user.uid).update({
           'lastLogin': FieldValue.serverTimestamp(),
         });
-
-        // Log the session start
-        await logSessionStart(user.uid);
+        currentUser = user;
 
         // Navigate to StudySyncMainPage
         Navigator.pushReplacement(
@@ -258,19 +230,6 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      logSessionEnd(user.uid).then((_) {
-        print("Session ended for user: ${user.uid}");
-      }).catchError((e) {
-        print("Error ending session: $e");
-      });
-    }
-    super.dispose();
-  }
 }
 
 class ForgotPasswordDialog extends StatelessWidget {
@@ -340,28 +299,36 @@ class ForgotPasswordDialog extends StatelessWidget {
                         hintText: 'Enter your email',
                       ),
                     ),
+                    SizedBox(height: 10),
+                    Text(
+                      'A password reset will be sent to the email entered.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70, // A softer white color
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: 20),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center, // Center the button
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          // Call reset password logic
-                          try {
-                            await FirebaseAuth.instance
-                                .sendPasswordResetEmail(
-                              email: emailController.text,
-                            );
-                            Navigator.of(dialogContext).pop(); // Close dialog
-                          } catch (e) {
-                            // Handle error
-                            print("Error sending password reset email: $e");
-                          }
-                        },
-                        child: Text('Reset Password'),
-                      ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await FirebaseAuth.instance.sendPasswordResetEmail(
+                              email: emailController.text);
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(content: Text('Password reset email sent')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(content: Text('Error sending email')),
+                          );
+                        }
+                      },
+                      child: Text('Send Reset Link'),
                     ),
                   ],
                 ),

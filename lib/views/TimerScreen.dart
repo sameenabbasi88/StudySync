@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:untitled/studysyncmain.dart';
+import 'package:untitled/views/studysyncmain.dart';
 
 import 'Friendpage.dart';
 import 'GroupsPage.dart';
@@ -217,6 +217,23 @@ class _TimerScreenState extends State<TimerScreen> {
                                   backgroundColor: Colors.white,
                                 ),
                               ),
+                              SizedBox(height: 10),
+                              Text(
+    "Timer is default",
+    style: TextStyle(color: Colors.white, fontSize: 12),
+    ),
+    SizedBox(height: 10),
+    GestureDetector(
+    onTap: () {
+    setState(() {
+    _seconds = 0; // Reset seconds
+    });
+    _startTimer();
+    },
+    child: Text(
+    "TIMER | STOPWATCH | POMODORO",
+    style: TextStyle(color: Colors.white),
+    ),)
                           ],
                         ),
                       ),

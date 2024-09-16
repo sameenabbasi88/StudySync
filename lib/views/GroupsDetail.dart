@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -32,6 +33,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   List<Task> tasks = [];
   String groupName = '';
   String creatorUsername = '';
+  String creatorId = ''; // Add this to store the creator's user ID
+  bool isFollowing = false; // Track follow status
 
   @override
   void initState() {
@@ -42,6 +45,27 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     } else {
       print('Group ID is empty');
     }
+  }
+  void _showTaskPopup() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TaskManager(
+            tasks: tasks,
+            onTaskAdded: (newTask) {
+              setState(() {
+                tasks.add(newTask); // Update the local task list
+              });
+            },
+            groupId: widget.groupId, // Pass the group ID
+          ),
+        );
+      },
+    );
   }
   void _updateTaskList(Task task) {
     setState(() {
@@ -59,8 +83,10 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       if (groupSnapshot.exists) {
         setState(() {
           groupName = groupSnapshot['groupname'] ?? 'Unknown Group'; // Fetch the group name
-          String creatorId = groupSnapshot['owner'] ?? ''; // Fetch the creator's user ID
+          creatorId = groupSnapshot['owner'] ?? ''; // Fetch the creator's user ID
           _fetchCreatorUsername(creatorId); // Fetch the creator's username
+          _checkIfFollowing(); // Check if the user is following the group
+          _checkIfCreator(); // Check if the current user is the creator
         });
       } else {
         print('Group document does not exist');
@@ -114,27 +140,118 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
-  void _showTaskPopup() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: TaskManager(
-            tasks: tasks,
-            onTaskAdded: (newTask) {
-              setState(() {
-                tasks.add(newTask); // Update the local task list
-              });
-            },
-            groupId: widget.groupId, // Pass the group ID
-          ),
-        );
-      },
-    );
+  Future<void> _checkIfCreator() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser; // Get current user from Firebase Auth
+
+      if (currentUser != null) {
+        String userId = currentUser.uid; // Retrieve the current user's ID
+
+        setState(() {
+          // Check if the current user is the creator
+          bool isCreator = userId == creatorId;
+          _showManageTasksButton(isCreator);
+        });
+      }
+    } catch (e) {
+      print('Error checking creator status: $e');
+    }
   }
+
+  void _showManageTasksButton(bool isCreator) {
+    // Logic to show or hide the "Manage Tasks" button
+    setState(() {
+      // Add logic here if needed
+    });
+  }
+
+  Future<void> _checkIfFollowing() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser; // Get current user from Firebase Auth
+
+      if (currentUser != null) {
+        String userId = currentUser.uid; // Retrieve the current user's ID from Firebase Authentication
+
+        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userSnapshot.exists) {
+          List<dynamic> followingGroups = userSnapshot['joinedgroup'] ?? [];
+          setState(() {
+            isFollowing = followingGroups.any((group) => group['groupId'] == widget.groupId);
+          });
+        }
+      }
+    } catch (e) {
+      print('Error checking follow status: $e');
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null) {
+        String userId = currentUser.uid;
+
+        DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(userId);
+        DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+
+        DocumentSnapshot groupSnapshot = await groupDoc.get();
+        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
+
+        if (isFollowing) {
+          // Unfollow the group
+          await userDoc.update({
+            'joinedgroup': FieldValue.arrayRemove([
+              {'groupId': widget.groupId, 'groupName': groupName}
+            ]),
+          });
+
+          // Optionally, remove tasks from user's todoTasks
+          await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+            'Todotasks': FieldValue.arrayRemove(
+                tasksFromFirestore.map((taskData) {
+                  return {
+                    'title': taskData['task'],
+                    'userId': userId,
+                  };
+                }).toList()
+            ),
+          });
+
+        } else {
+          // Follow the group
+          await userDoc.update({
+            'joinedgroup': FieldValue.arrayUnion([
+              {'groupId': widget.groupId, 'groupName': groupName}
+            ]),
+          });
+
+          // Add tasks to user's todoTasks
+          await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+            'Todotasks': FieldValue.arrayUnion(
+                tasksFromFirestore.map((taskData) {
+                  return {
+                    'title': taskData['task'],
+                    'userId': userId,
+                  };
+                }).toList()
+            ),
+          });
+        }
+
+        setState(() {
+          isFollowing = !isFollowing;
+        });
+      }
+    } catch (e) {
+      print('Error toggling follow status: $e');
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -170,20 +287,40 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              groupName,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Text(
+                                    groupName,
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Created by: $creatorUsername',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            SizedBox(width: 80),
-                            Text(
-                              'Created by: $creatorUsername',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white,
+                            SizedBox(width: 10),
+                            ElevatedButton(
+                              onPressed: _toggleFollow,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFollowing ? Colors.grey : Colors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                isFollowing ? 'Following' : 'Follow',
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
                           ],
@@ -203,24 +340,25 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                         ),
                       ),
                       SizedBox(height: 10),
-                      Center(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          onPressed: _showTaskPopup,
-                          child: Text(
-                            'Manage Tasks',
-                            style: TextStyle(fontSize: 20, color: Colors.white),
+                      // Conditionally show the "Manage Tasks" button
+                      if (FirebaseAuth.instance.currentUser?.uid == creatorId)
+                        Center(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            onPressed: _showTaskPopup,
+                            child: Text(
+                              'Manage Tasks',
+                              style: TextStyle(fontSize: 20, color: Colors.white),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -228,6 +366,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     );
   }
 }
+
 
 class TaskManager extends StatefulWidget {
   final List<Task> tasks;
@@ -261,6 +400,7 @@ class _TaskManagerState extends State<TaskManager> {
       if (widget.groupId.isEmpty) {
         throw Exception('Group ID is empty');
       }
+
       DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 
       await groupDoc.update({
@@ -275,6 +415,7 @@ class _TaskManagerState extends State<TaskManager> {
       print('Error adding task to Firestore: $e');
     }
   }
+
 
   void _showAddTaskDialog() {
     showDialog(

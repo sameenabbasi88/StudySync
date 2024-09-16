@@ -1,28 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'GroupsDetail.dart'; // Ensure Firebase is initialized
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase here
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StudySync',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: GroupsPage(),
-    );
-  }
-}
+import '../providers/Friend_Provider.dart';
+import 'GroupsDetail.dart';
 
 class GroupsPage extends StatefulWidget {
   @override
@@ -30,7 +12,6 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  List<String> addedFriends = [];
   Color selectedColor = Colors.red; // Default selected color for group
   TextEditingController groupNameController = TextEditingController();
   TextEditingController searchController = TextEditingController(); // Controller for search
@@ -38,26 +19,9 @@ class _GroupsPageState extends State<GroupsPage> {
   String searchQuery = ''; // Variable to hold search query
 
   @override
-  void initState() {
-    super.initState();
-    _fetchAddedFriends();
-  }
-
-  // Fetch added friends for the current user
-  void _fetchAddedFriends() async {
-    final userEmail = FirebaseAuth.instance.currentUser?.email;
-    if (userEmail != null) {
-      final doc = await FirebaseFirestore.instance.collection('friends').doc(userEmail).get();
-      if (doc.exists) {
-        setState(() {
-          addedFriends = List<String>.from(doc['fname'] ?? []);
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final friendProvider = Provider.of<FriendProvider>(context);
+
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -116,15 +80,11 @@ class _GroupsPageState extends State<GroupsPage> {
                           if (snapshot.hasError) {
                             return Center(child: Text('Error: ${snapshot.error}'));
                           }
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                            return Center(child: Text('No groups found'));
-                          }
 
-                          final groups = snapshot.data!.docs
-                              .where((doc) {
+                          final groups = snapshot.data?.docs.where((doc) {
                             final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
                             return groupName.contains(searchQuery);
-                          }).toList();
+                          }).toList() ?? [];
 
                           return GridView.builder(
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -155,7 +115,7 @@ class _GroupsPageState extends State<GroupsPage> {
               ),
             ),
             SizedBox(width: 16),
-            // The Friends list remains the same
+            // The Friends list updated to use FriendProvider
             Expanded(
               flex: 1,
               child: Container(
@@ -168,7 +128,7 @@ class _GroupsPageState extends State<GroupsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Added Friends (${addedFriends.length})',  // Display number of added friends
+                      'Added Friends (${friendProvider.addedFriends.length})',  // Display number of added friends
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -177,7 +137,7 @@ class _GroupsPageState extends State<GroupsPage> {
                     ),
                     SizedBox(height: 8),
                     Expanded(
-                      child: addedFriends.isEmpty
+                      child: friendProvider.addedFriends.isEmpty
                           ? Center(
                         child: Text(
                           'No friends added',
@@ -188,7 +148,7 @@ class _GroupsPageState extends State<GroupsPage> {
                         ),
                       )
                           : ListView.builder(
-                        itemCount: addedFriends.length,
+                        itemCount: friendProvider.addedFriends.length,
                         itemBuilder: (context, index) {
                           return ListTile(
                             leading: CircleAvatar(
@@ -196,7 +156,7 @@ class _GroupsPageState extends State<GroupsPage> {
                               backgroundColor: Colors.blue,
                             ),
                             title: Text(
-                              addedFriends[index],
+                              friendProvider.addedFriends[index],
                               style: TextStyle(color: Colors.white),
                             ),
                           );
@@ -401,4 +361,3 @@ class _GroupsPageState extends State<GroupsPage> {
     }
   }
 }
-

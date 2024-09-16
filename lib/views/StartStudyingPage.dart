@@ -178,6 +178,29 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
     }
   }
 
+  void _deleteTodoItem(Map<String, dynamic> task) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      setState(() {
+        todoList.remove(task);
+        _filterTasks(); // Update filtered list
+      });
+
+      await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+        'Todotasks': FieldValue.arrayRemove([{
+          'title': task['title'],
+          'date': task['date'].toIso8601String(),
+          'priority': task['priority'],
+        }])
+      });
+    } else {
+      print('No user is logged in.');
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,10 +307,14 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
                           return ToDoItem(
                             title: filteredTodoList[index]['title'],
                             initialDate: filteredTodoList[index]['date'],
+                            onDelete: () {
+                              _deleteTodoItem(filteredTodoList[index]);
+                            },
                           );
                         },
                       ),
                     ),
+
                     SizedBox(height: 10),
                     GestureDetector(
                       onTap: _showAddItemDialog,
@@ -321,8 +348,13 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
 class ToDoItem extends StatelessWidget {
   final String title;
   final DateTime initialDate;
+  final VoidCallback onDelete;
 
-  const ToDoItem({required this.title, required this.initialDate});
+  const ToDoItem({
+    required this.title,
+    required this.initialDate,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +362,38 @@ class ToDoItem extends StatelessWidget {
       title: Text(title, style: TextStyle(color: Colors.white)),
       subtitle: Text(DateFormat('EEE, d MMM').format(initialDate), style: TextStyle(color: Colors.white70)),
       contentPadding: EdgeInsets.symmetric(vertical: 4.0),
+      trailing: IconButton(
+        icon: Icon(Icons.delete, color: Colors.red),
+        onPressed: () {
+          // Show confirmation dialog before deletion
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text("Delete Task"),
+                content: Text("Do you really want to delete this task?"),
+                actions: [
+                  TextButton(
+                    child: Text("Cancel"),
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close the dialog
+                    },
+                  ),
+                  TextButton(
+                    child: Text("Delete"),
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close the dialog
+                      onDelete(); // Call the onDelete callback
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
+
+
