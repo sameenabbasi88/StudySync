@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(TaskManagerApp(groupId: ''));
@@ -189,6 +190,21 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
+  int _calculateTaskPriority(DateTime taskDueDate) {
+    DateTime today = DateTime.now();
+    Duration difference = taskDueDate.difference(today);
+
+    // Priority logic: closer the task due date, higher the priority
+    if (difference.inDays <= 1) {
+      return 1; // High priority
+    } else if (difference.inDays <= 3) {
+      return 2; // Medium priority
+    } else {
+      return 3; // Low priority
+    }
+  }
+
+
   Future<void> _toggleFollow() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
@@ -202,44 +218,48 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         DocumentSnapshot groupSnapshot = await groupDoc.get();
         List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
 
+        // Calculate the due date (7 days from now)
+        DateTime date = DateTime.now().add(Duration(days: 7));
+        String formattedDate = DateFormat('MM-dd-yyyy').format(date);
+
         if (isFollowing) {
-          // Unfollow the group
+          // Unfollow and remove tasks
           await userDoc.update({
-            'joinedgroup': FieldValue.arrayRemove([
-              {'groupId': widget.groupId, 'groupName': groupName}
-            ]),
+            'joinedgroup': FieldValue.arrayRemove([{
+              'groupId': widget.groupId,
+              'groupName': groupName,
+            }]),
           });
 
-          // Optionally, remove tasks from user's todoTasks
           await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
-            'Todotasks': FieldValue.arrayRemove(
-                tasksFromFirestore.map((taskData) {
-                  return {
-                    'title': taskData['task'],
-                    'userId': userId,
-                  };
-                }).toList()
-            ),
+            'Todotasks': FieldValue.arrayRemove(tasksFromFirestore.map((taskData) {
+              return {
+                'title': taskData['task'],
+                'userId': userId,
+                'date': formattedDate,
+                'priority': taskData['priority'],
+              };
+            }).toList()),
           });
-
         } else {
-          // Follow the group
+          // Follow and add tasks with the due date and priority
           await userDoc.update({
-            'joinedgroup': FieldValue.arrayUnion([
-              {'groupId': widget.groupId, 'groupName': groupName}
-            ]),
+            'joinedgroup': FieldValue.arrayUnion([{
+              'groupId': widget.groupId,
+              'groupName': groupName,
+            }]),
           });
 
-          // Add tasks to user's todoTasks
           await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
-            'Todotasks': FieldValue.arrayUnion(
-                tasksFromFirestore.map((taskData) {
-                  return {
-                    'title': taskData['task'],
-                    'userId': userId,
-                  };
-                }).toList()
-            ),
+            'Todotasks': FieldValue.arrayUnion(tasksFromFirestore.map((taskData) {
+              int taskPriority = _calculateTaskPriority(DateTime.now().add(Duration(days: 7)));
+              return {
+                'title': taskData['task'],
+                'userId': userId,
+                'date': formattedDate,
+                'priority': taskPriority,
+              };
+            }).toList()),
           });
         }
 
@@ -251,6 +271,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Error toggling follow status: $e');
     }
   }
+
+
 
 
   @override
@@ -285,31 +307,26 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                           color: Color(0xFFc1121f), // Maroon color
                           borderRadius: BorderRadius.circular(8.0),
                         ),
-                        child: Row(
+                        child: Wrap(
+                          spacing: 10, // Spacing between elements
+                          runSpacing: 10, // Spacing between rows if the button moves to the next line
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Text(
-                                    groupName,
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Created by: $creatorUsername',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              groupName,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                            SizedBox(width: 10),
+                            Text(
+                              'Created by: $creatorUsername',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                            ),
                             ElevatedButton(
                               onPressed: _toggleFollow,
                               style: ElevatedButton.styleFrom(
@@ -326,6 +343,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                           ],
                         ),
                       ),
+
                       SizedBox(height: 10),
                       Expanded(
                         child: ListView.builder(
@@ -367,7 +385,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   }
 }
 
-
 class TaskManager extends StatefulWidget {
   final List<Task> tasks;
   final ValueChanged<Task> onTaskAdded;
@@ -401,13 +418,22 @@ class _TaskManagerState extends State<TaskManager> {
         throw Exception('Group ID is empty');
       }
 
-      DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+      // Set the due date to 7 days from today
+      DateTime dueDate = DateTime.now().add(Duration(days: 7));
+      String formattedDate = DateFormat('yyyy-MM-dd').format(dueDate);
 
+      // Assign priority based on date or any other logic you want
+      int taskPriority = _calculateTaskPriority(dueDate);
+
+      // Add the new task to Firestore
+      DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       await groupDoc.update({
         'tasks': FieldValue.arrayUnion([
           {
             'task': taskName,
             'progress': 0.0, // Set initial progress
+            'date': formattedDate,
+            'priority': taskPriority,
           }
         ]),
       });
@@ -415,6 +441,15 @@ class _TaskManagerState extends State<TaskManager> {
       print('Error adding task to Firestore: $e');
     }
   }
+
+// Function to calculate task priority based on the due date
+  int _calculateTaskPriority(DateTime dueDate) {
+    DateTime today = DateTime.now();
+    // Example logic: Priority decreases as the task date is further in the future
+    int daysUntilDue = dueDate.difference(today).inDays;
+    return daysUntilDue <= 7 ? 1 : 2; // High priority if within 7 days
+  }
+
 
 
   void _showAddTaskDialog() {

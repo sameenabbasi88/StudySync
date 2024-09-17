@@ -10,6 +10,7 @@ import '../providers/timer_provider.dart';
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 import 'dart:async';
+import 'package:untitled/models/todo_task_model.dart'; // Import your model
 
 
 class StudySyncDashboard extends StatefulWidget {
@@ -109,7 +110,6 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
   }
 }
 
-
 // Header Section
 class HeaderSection extends StatelessWidget {
   final Function(String) onLinkPressed;
@@ -208,7 +208,7 @@ class _ToDoSectionState extends State<ToDoSection> {
           return Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Color(0xff003039), // Background color similar to the tasks container
+              color: Color(0xff003039),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -224,25 +224,20 @@ class _ToDoSectionState extends State<ToDoSection> {
         }
 
         List<dynamic> tasks = snapshot.data!.get('Todotasks') ?? [];
-        List<Map<String, dynamic>> todoList = tasks.map((task) {
-          return {
-            'title': task['title'] ?? 'Untitled', // Provide a default value
-            'date': task['date'] != null
-                ? DateTime.tryParse(task['date']) ?? DateTime.now() // Handle parsing and default value
-                : DateTime.now(), // Default date if null
-            'priority': task['priority'] ?? 0, // Default priority to 0 if not present
-          };
+        List<TodoTask> todoList = tasks.map((task) {
+          return TodoTask.fromMap(task);
         }).toList()
           ..sort((a, b) {
-            int priorityComparison = a['priority'].compareTo(b['priority']);
+            int priorityComparison = b.priority.compareTo(a.priority); // Descending order
             if (priorityComparison != 0) return priorityComparison;
-            return a['date'].compareTo(b['date']);
+            if (a.date == null || b.date == null) return 0;
+            return a.date!.compareTo(b.date!); // Ascending order
           });
 
         return Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Color(0xff003039), // Background color
+            color: Color(0xff003039),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -262,8 +257,9 @@ class _ToDoSectionState extends State<ToDoSection> {
                   itemCount: todoList.length,
                   itemBuilder: (context, index) {
                     return ToDoItem(
-                      title: todoList[index]['title'],
-                      initialDate: todoList[index]['date'],
+                      title: todoList[index].title,
+                      initialDate: todoList[index].date,
+                      priority: todoList[index].priority,
                     );
                   },
                 ),
@@ -275,47 +271,71 @@ class _ToDoSectionState extends State<ToDoSection> {
     );
   }
 }
+
 class ToDoItem extends StatefulWidget {
   final String title;
-  final DateTime initialDate;
+  final DateTime? initialDate;
+  final int priority;
 
-  const ToDoItem({required this.title, required this.initialDate});
+  const ToDoItem({
+    required this.title,
+    this.initialDate,
+    required this.priority,
+  });
 
   @override
   _ToDoItemState createState() => _ToDoItemState();
 }
+
 class _ToDoItemState extends State<ToDoItem> {
-  late DateTime _selectedDate;
+  late DateTime? _selectedDate;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.initialDate; // Initialize selected date
+    _selectedDate = widget.initialDate; // Initialize with the date from Firestore
   }
 
-  void _updateDate(BuildContext context, DateTime newDate) async {
+  Stream<DocumentSnapshot> _getTaskStream() {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    if (userId.isNotEmpty) {
+      return FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId)
+          .snapshots();
+    } else {
+      return Stream.empty();
+    }
+  }
+
+  void _updateDate(DateTime newDate) async {
     User? currentUser = FirebaseAuth.instance.currentUser;
     String userId = currentUser?.uid ?? '';
 
     if (userId.isNotEmpty) {
       try {
-        DocumentSnapshot userTaskSnapshot = await FirebaseFirestore.instance.collection('todoTasks').doc(userId).get();
+        DocumentReference docRef = FirebaseFirestore.instance.collection('todoTasks').doc(userId);
+        DocumentSnapshot userTaskSnapshot = await docRef.get();
 
         if (userTaskSnapshot.exists && userTaskSnapshot.data() != null) {
           List<dynamic> tasks = userTaskSnapshot.get('Todotasks');
 
           var updatedTasks = tasks.map((task) {
-            if (task['title'] == widget.title && task['date'] == widget.initialDate.toIso8601String()) {
+            if (task['title'] == widget.title) {
+              // Update the task with the new date
               return {
                 'title': task['title'],
-                'date': newDate.toIso8601String(),
+                'date': newDate,
                 'priority': task['priority']
               };
             }
             return task;
           }).toList();
 
-          await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
+          // Update Firestore with the new task list
+          await docRef.update({
             'Todotasks': updatedTasks,
           });
 
@@ -329,6 +349,9 @@ class _ToDoItemState extends State<ToDoItem> {
         }
       } catch (e) {
         print('Error updating task: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating task.')),
+        );
       }
     } else {
       print('No user is logged in.');
@@ -337,60 +360,89 @@ class _ToDoItemState extends State<ToDoItem> {
 
   @override
   Widget build(BuildContext context) {
+    DateTime firstDate = DateTime(2000);
+    DateTime lastDate = DateTime(2101);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: Colors.red,
-            radius: 8,
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TimerScreen(
-                      taskTitle: widget.title,
-                      taskDate: _selectedDate,
-                    ),
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: _getTaskStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return SizedBox.shrink(); // Handle no data scenario if necessary
+          }
+
+          List<dynamic> tasks = snapshot.data!.get('Todotasks') ?? [];
+          var task = tasks.firstWhere(
+                (task) => task['title'] == widget.title,
+            orElse: () => null,
+          );
+
+          DateTime? effectiveDate = task?['date']?.toDate();
+
+          return Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.red,
+                radius: 8,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TimerScreen(
+                          taskTitle: widget.title,
+                          taskDate: effectiveDate ?? DateTime.now(),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
-                );
-              },
-              child: Text(
-                widget.title,
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () async {
-              DateTime? pickedDate = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2101),
-              );
-              if (pickedDate != null && pickedDate != _selectedDate) {
-                _updateDate(context, pickedDate);
-              }
-            },
-            child: Text(
-              DateFormat('EEE, d MMM').format(_selectedDate),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                decoration: TextDecoration.underline,
+              SizedBox(width: 10),
+              GestureDetector(
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: effectiveDate ?? DateTime.now(),
+                    firstDate: firstDate,
+                    lastDate: lastDate,
+                  );
+                  if (pickedDate != null && pickedDate != _selectedDate) {
+                    _updateDate(pickedDate);
+                  }
+                },
+                child: effectiveDate != null
+                    ? Text(
+                  DateFormat('EEE, d MMM').format(effectiveDate),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    decoration: TextDecoration.underline,
+                  ),
+                )
+                    : SizedBox.shrink(), // Hide if no date is set
               ),
-            ),
-          ),
-        ],
+
+            ],
+          );
+        },
       ),
     );
   }
 }
+
 class DailyStreakSection extends StatefulWidget {
   @override
   _DailyStreakSectionState createState() => _DailyStreakSectionState();

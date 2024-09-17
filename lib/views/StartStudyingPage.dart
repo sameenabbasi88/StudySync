@@ -39,7 +39,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
           todoList = tasks.map((task) {
             return {
               'title': task['title'],
-              'date': DateTime.parse(task['date']),
+              'date': (task['date'] as Timestamp).toDate(), // Convert Timestamp to DateTime
               'priority': task['priority'] ?? 0,
             };
           }).toList()
@@ -56,6 +56,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
       print('No user is logged in.');
     }
   }
+
 
   void _filterTasks() {
     setState(() {
@@ -155,7 +156,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
             .set({
           'Todotasks': FieldValue.arrayUnion([{
             'title': title,
-            'date': date.toIso8601String(),
+            'date': Timestamp.fromDate(date), // Save as Firestore Timestamp
             'priority': priority,
           }])
         }, SetOptions(merge: true));
@@ -164,6 +165,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
       }
     }
   }
+
 
   int _calculatePriority(DateTime date) {
     DateTime now = DateTime.now();
@@ -191,7 +193,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
       await FirebaseFirestore.instance.collection('todoTasks').doc(userId).update({
         'Todotasks': FieldValue.arrayRemove([{
           'title': task['title'],
-          'date': task['date'].toIso8601String(),
+          'date': Timestamp.fromDate(task['date']), // Ensure date is stored as a Timestamp
           'priority': task['priority'],
         }])
       });
@@ -199,6 +201,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
       print('No user is logged in.');
     }
   }
+
 
 
   @override
