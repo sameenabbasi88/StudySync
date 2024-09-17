@@ -202,8 +202,6 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

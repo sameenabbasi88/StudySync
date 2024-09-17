@@ -1,33 +1,10 @@
 import 'dart:html' as html; // Import for handling browser events
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:untitled/views/studysyncmain.dart';
 import 'SignupPage.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  if (kIsWeb) {
-    await Firebase.initializeApp(
-      options: FirebaseOptions(
-        apiKey: "AIzaSyA3Eu-HgMmYxEsk33FQ0wtq_Ro3_gVp2PY",
-        authDomain: "studysync-84b8f.firebaseapp.com",
-        projectId: "studysync-84b8f",
-        storageBucket: "studysync-84b8f.appspot.com",
-        messagingSenderId: "593364241464",
-        appId: "1:593364241464:web:0ef9917404222fd2226acd",
-        measurementId: "G-FCP2YSKDJ2",
-      ),
-    );
-  } else {
-    await Firebase.initializeApp();
-  }
-
-  runApp(const StudySyncLoginApp());
-}
 
 class StudySyncLoginApp extends StatelessWidget {
   const StudySyncLoginApp({super.key});

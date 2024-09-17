@@ -3,10 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-void main() {
-  runApp(TaskManagerApp(groupId: ''));
-}
-
 class TaskManagerApp extends StatelessWidget {
   final String groupId;
 
