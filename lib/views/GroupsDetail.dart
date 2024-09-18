@@ -36,6 +36,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   @override
   void initState() {
     super.initState();
+    _startListeningToTasks();
     if (widget.groupId.isNotEmpty) {
       _fetchGroupDetails(); // Fetch group details when the screen is initialized
       _fetchTasks(); // Fetch tasks
@@ -56,6 +57,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
             onTaskAdded: (newTask) {
               setState(() {
                 tasks.add(newTask); // Update the local task list
+                _updateTodoTasks([newTask]); // Ensure new tasks are pushed to followers
               });
             },
             groupId: widget.groupId, // Pass the group ID
@@ -64,11 +66,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       },
     );
   }
-  void _updateTaskList(Task task) {
-    setState(() {
-      tasks = tasks.where((t) => t.taskName != task.taskName).toList();
-    });
-  }
+
+
 
   Future<void> _fetchGroupDetails() async {
     try {
@@ -177,7 +176,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         if (userSnapshot.exists) {
           List<dynamic> followingGroups = userSnapshot['joinedgroup'] ?? [];
           setState(() {
-            isFollowing = followingGroups.any((group) => group['groupId'] == widget.groupId);
+            // Ensure groupId is compared as a string
+            isFollowing = followingGroups.any((group) => group['groupId'].toString() == widget.groupId.toString());
           });
         }
       }
@@ -185,6 +185,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Error checking follow status: $e');
     }
   }
+
 
   int _calculateTaskPriority(DateTime taskDueDate) {
     DateTime today = DateTime.now();
@@ -199,6 +200,67 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       return 3; // Low priority
     }
   }
+
+  void _startListeningToTasks() {
+    FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .snapshots()
+        .listen((groupSnapshot) {
+      if (groupSnapshot.exists) {
+        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
+        setState(() {
+          tasks = tasksFromFirestore.map((taskData) {
+            return Task(
+              taskName: taskData['task'],
+              progress: taskData['progress'],
+            );
+          }).toList();
+        });
+
+        // Update the todoTasks collection when tasks change
+        _updateTodoTasks(tasksFromFirestore);
+      }
+    });
+  }
+
+  Future<void> _updateTodoTasks(List<dynamic> newTasks) async {
+    try {
+      // Fetch the group document to get the list of followers
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      if (groupSnapshot.exists) {
+        List<dynamic> followers = groupSnapshot['followers'] ?? [];
+
+        for (var follower in followers) {
+          String followerId = follower['userId'].toString(); // Ensure userId is String
+
+          // Update todoTasks for each follower
+          await FirebaseFirestore.instance.collection('todoTasks').doc(followerId).set({
+            'Todotasks': FieldValue.arrayUnion(newTasks.map((taskData) {
+              DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
+              int taskPriority = _calculateTaskPriority(date); // Calculate the priority
+              String formattedDate = DateFormat('MM-dd-yyyy').format(date);
+
+              return {
+                'title': taskData['task'],
+                'userId': followerId, // Ensure userId is String
+                'date': formattedDate,
+                'priority': taskPriority,
+              };
+            }).toList()),
+          }, SetOptions(merge: true)); // Merge with existing tasks
+        }
+      }
+    } catch (e) {
+      print('Error updating todoTasks for followers: $e');
+    }
+  }
+
+
 
 
   Future<void> _toggleFollow() async {
@@ -219,11 +281,18 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         String formattedDate = DateFormat('MM-dd-yyyy').format(date);
 
         if (isFollowing) {
-          // Unfollow and remove tasks
+          // Unfollow the group and remove tasks
           await userDoc.update({
             'joinedgroup': FieldValue.arrayRemove([{
-              'groupId': widget.groupId,
+              'groupId': widget.groupId, // Ensure groupId is String
               'groupName': groupName,
+            }]),
+          });
+
+          // Remove user from followers in the group document
+          await groupDoc.update({
+            'followers': FieldValue.arrayRemove([{
+              'userId': userId, // Ensure userId is String
             }]),
           });
 
@@ -238,11 +307,18 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
             }).toList()),
           });
         } else {
-          // Follow and add tasks with the due date and priority
+          // Follow the group and add tasks with the due date and priority
           await userDoc.update({
             'joinedgroup': FieldValue.arrayUnion([{
-              'groupId': widget.groupId,
+              'groupId': widget.groupId, // Ensure groupId is String
               'groupName': groupName,
+            }]),
+          });
+
+          // Add user to followers in the group document
+          await groupDoc.update({
+            'followers': FieldValue.arrayUnion([{
+              'userId': userId, // Ensure userId is String
             }]),
           });
 
@@ -260,13 +336,14 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         }
 
         setState(() {
-          isFollowing = !isFollowing;
+          isFollowing = !isFollowing; // Toggle follow status
         });
       }
     } catch (e) {
       print('Error toggling follow status: $e');
     }
   }
+
 
 
 

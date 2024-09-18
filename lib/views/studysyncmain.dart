@@ -118,28 +118,37 @@ class HeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    // Get the screen width
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Adjust the main text and link sizes dynamically based on screen width
+    double mainTextSize = screenWidth * 0.07; // Adjust based on screen width
+    double linkTextSize = screenWidth * 0.045; // Adjust for link text
+
+    // Adjust spacing dynamically with a max and min limit
+    double spacing = screenWidth * 0.03; // Smaller spacing for smaller screens
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: spacing, // Spacing between elements
+      runSpacing: 10,  // Spacing between rows when wrapping occurs
       children: [
         GestureDetector(
           onTap: () {
-            onLinkPressed('studysync'); // Show StudySync context
+            onLinkPressed('studysync');
           },
           child: Text(
             'STUDYSYNC',
             style: TextStyle(
-              fontSize: 28,
+              fontSize: mainTextSize.clamp(20, 30), // Set a min and max size
               fontWeight: FontWeight.bold,
               color: Colors.red,
             ),
           ),
         ),
-        Spacer(),
-        HeaderLink(text: 'Friends', onLinkPressed: onLinkPressed),
-        SizedBox(width: 60),
-        HeaderLink(text: 'Groups', onLinkPressed: onLinkPressed),
-        SizedBox(width: 60),
-        HeaderLink(text: 'Profile', onLinkPressed: onLinkPressed),
-        SizedBox(width: 20),
+        HeaderLink(text: 'Friends', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
+        HeaderLink(text: 'Groups', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
+        HeaderLink(text: 'Profile', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
       ],
     );
   }
@@ -147,32 +156,23 @@ class HeaderSection extends StatelessWidget {
 
 class HeaderLink extends StatelessWidget {
   final String text;
+  final double fontSize;
   final Function(String) onLinkPressed;
 
-  const HeaderLink({required this.text, required this.onLinkPressed});
+  const HeaderLink({required this.text, required this.fontSize, required this.onLinkPressed});
 
   @override
   Widget build(BuildContext context) {
-    // Fetch screen width
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    // Determine font size and padding dynamically based on screen width
-    double fontSize = screenWidth * 0.045; // Adjusts font size relative to screen
-    double horizontalPadding = screenWidth * 0.02; // Adjust padding
-
     return GestureDetector(
       onTap: () {
-        onLinkPressed(text.toLowerCase()); // Pass which link was clicked
+        onLinkPressed(text.toLowerCase());
       },
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: fontSize.clamp(14, 22), // Min 14, Max 22 font size
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: fontSize.clamp(14, 22), // Clamp font size between 14 and 22
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
         ),
       ),
     );
@@ -382,7 +382,13 @@ class _ToDoItemState extends State<ToDoItem> {
             orElse: () => null,
           );
 
-          DateTime? effectiveDate = task?['date']?.toDate();
+          DateTime? effectiveDate;
+
+          if (task?['date'] is Timestamp) {
+            effectiveDate = (task['date'] as Timestamp).toDate();
+          } else if (task?['date'] is String) {
+            effectiveDate = DateFormat('MM-dd-yyyy').parse(task['date']);
+          }
 
           return Row(
             children: [
@@ -434,7 +440,6 @@ class _ToDoItemState extends State<ToDoItem> {
                 )
                     : SizedBox.shrink(), // Hide if no date is set
               ),
-
             ],
           );
         },
@@ -442,6 +447,7 @@ class _ToDoItemState extends State<ToDoItem> {
     );
   }
 }
+
 
 class DailyStreakSection extends StatefulWidget {
   @override

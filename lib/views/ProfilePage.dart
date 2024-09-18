@@ -13,77 +13,27 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _joinedDateController = TextEditingController();
-  final TextEditingController _groupsController = TextEditingController();
-  final TextEditingController _favoriteSubjectController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _profilePhotoUrl = 'https://via.placeholder.com/150'; // Placeholder
+
+  // Controllers for the text fields
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _favoriteSubjectController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchUserProfile();
+    _fetchProfileData();
   }
 
-  Future<void> _fetchUserProfile() async {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        QuerySnapshot userQuery = await FirebaseFirestore.instance
-            .collection('users')
-            .where('email', isEqualTo: currentUser.email)
-            .get();
-
-        if (userQuery.docs.isNotEmpty) {
-          DocumentSnapshot userDoc = userQuery.docs.first;
-          Timestamp timestamp = userDoc['date'];
-          DateTime joinedDate = timestamp.toDate();
-          String formattedDate = DateFormat('yyyy-MM-dd').format(joinedDate);
-
-          // Fetch the profile photo URL if it exists, otherwise use a placeholder
-          String profilePhotoUrl = userDoc['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
-
-          // Fetch the groups from the joinedgroup array, only show 'groupName'
-          List<dynamic> joinedGroups = userDoc['joinedgroup'] ?? [];
-          List<String> groupNames = joinedGroups
-              .map((group) => group['groupName'] as String) // Extract 'groupName'
-              .toList();
-          String groupsList = groupNames.join(', '); // Convert to a comma-separated string
-
-          setState(() {
-            _usernameController.text = userDoc['username'];
-            _joinedDateController.text = 'Joined: $formattedDate';
-            _profilePhotoUrl = profilePhotoUrl;
-            _favoriteSubjectController.text = userDoc['favoriteSubject'] ?? ''; // Fetch the favorite subject
-            _groupsController.text = groupsList; // Update the groups field
-          });
-        }
-      }
-    } catch (error) {
-      print('Error fetching user profile: $error');
-    }
-  }
-
-  Future<void> _updateUserProfile() async {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        final userDoc = FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid);
-
-        await userDoc.update({
-          'username': _usernameController.text,
-          'groups': _groupsController.text,
-          'favoriteSubject': _favoriteSubjectController.text,
-        });
-
-        // Fetch and update profile photo URL if needed
-        // await _updateProfilePhotoUrl(_profilePhotoUrl); // Uncomment if you have a separate profile photo URL update function
-      }
-    } catch (e) {
-      print('Error updating user profile: $e');
+  void _fetchProfileData() async {
+    final userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
+    if (userDoc.exists) {
+      final data = userDoc.data()!;
+      _usernameController.text = data['username'] ?? '';
+      _favoriteSubjectController.text = data['favoriteSubject'] ?? '';
     }
   }
 
@@ -101,12 +51,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: InputDecoration(labelText: 'Username'),
               ),
               TextField(
-                controller: _joinedDateController,
+                controller: TextEditingController()..text = DateFormat('yyyy-MM-dd').format(DateTime.now()), // Default to current date
                 decoration: InputDecoration(labelText: 'Joined Date'),
                 enabled: false,
               ),
               TextField(
-                controller: _groupsController,
+                controller: TextEditingController()..text = 'Your Group Names Here', // Example placeholder
                 decoration: InputDecoration(labelText: 'Groups'),
                 enabled: false,
               ),
@@ -118,10 +68,20 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                _updateUserProfile(); // Save changes to Firestore
-                setState(() {}); // Refresh the state
-                Navigator.of(context).pop();
+              onPressed: () async {
+                // Save changes to Firestore
+                final username = _usernameController.text;
+                final favoriteSubject = _favoriteSubjectController.text;
+
+                try {
+                  await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
+                    'username': username,
+                    'favoriteSubject': favoriteSubject,
+                  });
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  print('Error updating profile: $e');
+                }
               },
               child: Text('Save'),
             ),
@@ -147,7 +107,7 @@ class _ProfilePageState extends State<ProfilePage> {
         final imageData = result.files.single.bytes!;
         final storageRef = FirebaseStorage.instance
             .ref()
-            .child('profile_photos/${FirebaseAuth.instance.currentUser!.uid}.jpg');
+            .child('profile_photos/${_auth.currentUser!.uid}.jpg');
 
         final uploadTask = storageRef.putData(imageData);
         final snapshot = await uploadTask;
@@ -166,9 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _updateProfilePhotoUrl(String photoUrl) async {
     try {
-      final userDoc = FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid);
+      final userDoc = _firestore.collection('users').doc(_auth.currentUser!.uid);
       await userDoc.update({'profilePhotoUrl': photoUrl});
     } catch (e) {
       print('Error updating profile photo URL: $e');
@@ -229,43 +187,70 @@ class _ProfilePageState extends State<ProfilePage> {
                             flex: 1,
                             child: Padding(
                               padding: EdgeInsets.all(8.0),
-                              child: Container(
-                                padding: EdgeInsets.all(16),
-                                color: Colors.grey[300],
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              child: StreamBuilder<DocumentSnapshot>(
+                                stream: _firestore.collection('users').doc(_auth.currentUser!.uid).snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return Center(child: CircularProgressIndicator());
+                                  }
+                                  if (!snapshot.hasData || !snapshot.data!.exists) {
+                                    return Center(child: Text('No profile data available'));
+                                  }
+
+                                  final userDoc = snapshot.data!;
+                                  Timestamp timestamp = userDoc['date'];
+                                  DateTime joinedDate = timestamp.toDate();
+                                  String formattedDate = DateFormat('yyyy-MM-dd').format(joinedDate);
+
+                                  // Fetch the profile photo URL if it exists, otherwise use a placeholder
+                                  String profilePhotoUrl = userDoc['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+
+                                  // Fetch the groups from the joinedgroup array, only show 'groupName'
+                                  List<dynamic> joinedGroups = userDoc['joinedgroup'] ?? [];
+                                  List<String> groupNames = joinedGroups
+                                      .map((group) => group['groupName'] as String) // Extract 'groupName'
+                                      .toList();
+                                  String groupsList = groupNames.join(', '); // Convert to a comma-separated string
+
+                                  return Container(
+                                    padding: EdgeInsets.all(16),
+                                    color: Colors.grey[300],
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          'Username: ${_usernameController.text}',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                          ),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Username: ${userDoc['username'] ?? 'Unknown User'}',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.edit, color: Colors.blue),
+                                              onPressed: _editProfile,
+                                            ),
+                                          ],
                                         ),
-                                        IconButton(
-                                          icon: Icon(Icons.edit, color: Colors.blue),
-                                          onPressed: _editProfile,
+                                        Text(
+                                          'Joined: $formattedDate', // Joined date
+                                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                                        ),
+                                        Text(
+                                          'In Groups: $groupsList', // Groups
+                                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                                        ),
+                                        Text(
+                                          'Favorite Subject: ${userDoc['favoriteSubject'] ?? 'Not set'}', // Favorite subject
+                                          style: TextStyle(fontSize: 16, color: Colors.black87),
                                         ),
                                       ],
                                     ),
-                                    Text(
-                                      _joinedDateController.text,
-                                      style: TextStyle(fontSize: 16, color: Colors.black87),
-                                    ),
-                                    Text(
-                                      'In Groups: ${_groupsController.text}',
-                                      style: TextStyle(fontSize: 16, color: Colors.black87),
-                                    ),
-                                    Text(
-                                      'Favorite Subject: ${_favoriteSubjectController.text}',
-                                      style: TextStyle(fontSize: 16, color: Colors.black87),
-                                    ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -331,3 +316,4 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
+

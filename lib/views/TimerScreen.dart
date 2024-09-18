@@ -66,12 +66,11 @@ class _TimerScreenState extends State<TimerScreen> {
     }
   }
 
-  // Timer logic remains the same
+  // Timer logic
   String _formatTime(int seconds) {
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
+    final minutes = (seconds ~/ 60);
     final secs = seconds % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   String _getFormattedDate() {
@@ -87,18 +86,26 @@ class _TimerScreenState extends State<TimerScreen> {
     return 'Today, $day $monthName $year';
   }
 
-
-
-  void _startTimer() {
+  // Pomodoro Timer Logic
+  void _startPomodoroTimer() {
     setState(() {
       _isRunning = true;
       _isPaused = false;
-      _isCompleted = false; // Reset completion status when starting the timer
+      _seconds = 1500; // Set timer to 25 minutes (1500 seconds)
+      _isCompleted = false;
     });
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        _seconds++;
-      });
+      if (_seconds > 0) {
+        setState(() {
+          _seconds--;
+        });
+      } else {
+        _timer.cancel();
+        setState(() {
+          _isCompleted = true;
+          _isRunning = false;
+        });
+      }
     });
   }
 
@@ -113,16 +120,48 @@ class _TimerScreenState extends State<TimerScreen> {
     setState(() {
       _isPaused = false;
     });
-    _startTimer();
+    _startPomodoroTimer();
   }
 
-  void _completeTask() {
+  void _completeTask() async {
     setState(() {
       _isRunning = false;
       _isPaused = false;
       _timer.cancel();
       _isCompleted = true; // Set task as completed
     });
+
+    // Get the current user
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    String userId = currentUser?.uid ?? '';
+
+    // Check if the user is logged in
+    if (userId.isNotEmpty) {
+      // Reference to the user's todoTasks document
+      DocumentReference docRef = FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId);
+
+      // Get the current task list from the database
+      DocumentSnapshot docSnapshot = await docRef.get();
+
+      if (docSnapshot.exists) {
+        List<dynamic> tasks = docSnapshot.get('Todotasks') ?? [];
+
+        // Remove the task from the list by matching the title
+        tasks.removeWhere((task) => task['title'] == widget.taskTitle);
+
+        // Update the Firestore document with the new list of tasks
+        await docRef.update({
+          'Todotasks': tasks,
+        });
+
+        // Optionally, show a message when the task is removed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Task "${widget.taskTitle}" completed and deleted.')),
+        );
+      }
+    }
   }
 
   void _handleLinkPress(String link) {
@@ -186,7 +225,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             SizedBox(height: 20),
                             if (!_isRunning)
                               ElevatedButton(
-                                onPressed: _startTimer,
+                                onPressed: _startPomodoroTimer,
                                 child: Text("START"),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
@@ -217,23 +256,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                   backgroundColor: Colors.white,
                                 ),
                               ),
-                              SizedBox(height: 10),
-                              Text(
-    "Timer is default",
-    style: TextStyle(color: Colors.white, fontSize: 12),
-    ),
-    SizedBox(height: 10),
-    GestureDetector(
-    onTap: () {
-    setState(() {
-    _seconds = 0; // Reset seconds
-    });
-    _startTimer();
-    },
-    child: Text(
-    "TIMER | STOPWATCH | POMODORO",
-    style: TextStyle(color: Colors.white),
-    ),)
+                            SizedBox(height: 10),
+                            Text(
+                              "Timer is default",
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                            SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: _startPomodoroTimer,
+                              child: Text(
+                                "TIMER | STOPWATCH | POMODORO",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -281,7 +316,6 @@ class _TimerScreenState extends State<TimerScreen> {
                             "UNCOMPLETED TASKS",
                             style: TextStyle(fontSize: 18, color: Colors.white),
                           ),
-                          SizedBox(height: 10),
                           Expanded(
                             child: ListView.builder(
                               itemCount: uncompletedTasks.length,
@@ -295,11 +329,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                                   subtitle: Text(
                                     DateFormat('EEE, d MMM').format(task['date']),
-                                    style: TextStyle(color: Colors.white),
+                                    style: TextStyle(color: Colors.white70),
                                   ),
-                                  onTap: () {
-                                    // Optionally, navigate to this task's timer screen
-                                  },
                                 );
                               },
                             ),
@@ -312,10 +343,44 @@ class _TimerScreenState extends State<TimerScreen> {
               ),
             ),
           ),
-          AdvertisementSection(),
         ],
       ),
     );
   }
 }
 
+// Placeholder for HeaderSection component
+class HeaderSection extends StatelessWidget {
+  final Function(String) onLinkPressed;
+
+  HeaderSection({required this.onLinkPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(16.0),
+      color: Color(0xff003039),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          GestureDetector(
+            onTap: () => onLinkPressed('studysync'),
+            child: Text('STUDYSYNC', style: TextStyle(color: Colors.white)),
+          ),
+          GestureDetector(
+            onTap: () => onLinkPressed('friends'),
+            child: Text('FRIENDS', style: TextStyle(color: Colors.white)),
+          ),
+          GestureDetector(
+            onTap: () => onLinkPressed('groups'),
+            child: Text('GROUPS', style: TextStyle(color: Colors.white)),
+          ),
+          GestureDetector(
+            onTap: () => onLinkPressed('profile'),
+            child: Text('PROFILE', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}

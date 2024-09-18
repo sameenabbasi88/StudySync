@@ -4,13 +4,13 @@ import 'package:flutter/foundation.dart';
 class FirebaseOptionsConfig {
   static FirebaseOptions get firebaseOptions {
     return FirebaseOptions(
-      apiKey: "AIzaSyA3Eu-HgMmYxEsk33FQ0wtq_Ro3_gVp2PY",
-      authDomain: "studysync-84b8f.firebaseapp.com",
-      projectId: "studysync-84b8f",
-      storageBucket: "studysync-84b8f.appspot.com",
-      messagingSenderId: "593364241464",
-      appId: "1:593364241464:web:0ef9917404222fd2226acd",
-      measurementId: "G-FCP2YSKDJ2",
+        apiKey: "AIzaSyAOVm1ot2ISCRJQ7RzsAvVzHPH0ljB1Xws",
+        authDomain: "studysync-7c794.firebaseapp.com",
+        projectId: "studysync-7c794",
+        storageBucket: "studysync-7c794.appspot.com",
+        messagingSenderId: "63635700112",
+        appId: "1:63635700112:web:047016f07d95cc777cdb15",
+        measurementId: "G-P3KWNZCWLM"
     );
   }
 }
