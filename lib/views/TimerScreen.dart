@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:untitled/views/studysyncmain.dart';
-
+import '../utils/color.dart';
+import '../widgets/Header_Section.dart';
 import 'Friendpage.dart';
 import 'GroupsPage.dart';
 import 'ProfilePage.dart'; // Import the file containing HeaderSection
@@ -25,6 +26,7 @@ class _TimerScreenState extends State<TimerScreen> {
   bool _isRunning = false;
   bool _isPaused = false;
   bool _isCompleted = false;
+  bool isPomodoro = false; // Add this line
   List<Map<String, dynamic>> uncompletedTasks = []; // Store uncompleted tasks
 
   @override
@@ -56,7 +58,9 @@ class _TimerScreenState extends State<TimerScreen> {
           uncompletedTasks = tasks
               .map((task) => {
             'title': task['title'],
-            'date': DateTime.parse(task['date']),
+            'date': (task['date'] is Timestamp)
+                ? (task['date'] as Timestamp).toDate()
+                : DateFormat('MM-dd-yyyy').parse(task['date']),
           })
               .toList()
               .where((task) => task['title'] != widget.taskTitle) // Exclude the current task
@@ -89,6 +93,7 @@ class _TimerScreenState extends State<TimerScreen> {
   // Pomodoro Timer Logic
   void _startPomodoroTimer() {
     setState(() {
+      isPomodoro = true; // Set to true when starting Pomodoro
       _isRunning = true;
       _isPaused = false;
       _seconds = 1500; // Set timer to 25 minutes (1500 seconds)
@@ -109,6 +114,23 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
+  void _startButtonTimer() {
+    setState(() {
+      isPomodoro = false; // Set to false when starting general timer
+      _isRunning = true;
+      _isPaused = false;
+      _seconds = 0; // Start timer from 0
+      _isCompleted = false;
+    });
+
+    // Start a periodic timer that increments every second
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _seconds++; // Increment the timer by 1 second every tick
+      });
+    });
+  }
+
   void _pauseTimer() {
     setState(() {
       _isPaused = true;
@@ -116,11 +138,48 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
-  void _resumeTimer() {
+  void _resumeTimerS() {
     setState(() {
       _isPaused = false;
+      _isRunning = true;
     });
-    _startPomodoroTimer();
+
+    // Resume the timer from where it was paused
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_seconds > 0) {
+        setState(() {
+          _seconds++;
+        });
+      } else {
+        _timer.cancel();
+        setState(() {
+          _isCompleted = true;
+          _isRunning = false;
+        });
+      }
+    });
+  }
+
+  void _resumeTimerP() {
+    setState(() {
+      _isPaused = false;
+      _isRunning = true;
+    });
+
+    // Resume the timer from where it was paused
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_seconds > 0) {
+        setState(() {
+          _seconds--;
+        });
+      } else {
+        _timer.cancel();
+        setState(() {
+          _isCompleted = true;
+          _isRunning = false;
+        });
+      }
+    });
   }
 
   void _completeTask() async {
@@ -160,6 +219,9 @@ class _TimerScreenState extends State<TimerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Task "${widget.taskTitle}" completed and deleted.')),
         );
+
+        // Refresh the uncompleted tasks list
+        _fetchUncompletedTasks();
       }
     }
   }
@@ -186,200 +248,223 @@ class _TimerScreenState extends State<TimerScreen> {
     );
   }
 
+  void _resetToStartScreen() {
+    setState(() {
+      _timer.cancel(); // Stop the timer
+      _seconds = 0; // Reset the seconds count
+      _isRunning = false; // Ensure the timer is not running
+      _isPaused = false; // Reset any paused state
+      _isCompleted = false; // Mark the task as not completed
+    });
+  }
+
+  void _onResumeButtonPressed() {
+    if (isPomodoro) {
+      _resumeTimerP();
+    } else {
+      _resumeTimerS();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          HeaderSection(onLinkPressed: _handleLinkPress),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_getFormattedDate(), style: TextStyle(fontSize: 18)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
+      body: Container(
+        color: AppColors.backgroundColor,
+        child: Column(
+          children: [
+            HeaderSection(onLinkPressed: _handleLinkPress),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Timer Section
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Color(0xff003039),
-                        borderRadius: BorderRadius.circular(16),
+                  Text(_getFormattedDate(), style: TextStyle(fontSize: 18)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    // Timer Section
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Color(0xff003039),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Display the timer
+                              Text(
+                                _formatTime(_seconds),
+                                style: TextStyle(fontSize: 50, color: Colors.white),
+                              ),
+                              SizedBox(height: 20),
+
+                              // Start button, disabled if task is completed
+                              if (!_isRunning && !_isCompleted)
+                                ElevatedButton(
+                                  onPressed: !_isCompleted ? _startButtonTimer : null, // Disable when completed
+                                  child: Text("START"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              // Pause button
+                              if (_isRunning && !_isPaused)
+                                ElevatedButton(
+                                  onPressed: _pauseTimer,
+                                  child: Text("PAUSE"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              // Resume button
+                              if (_isPaused)
+                                ElevatedButton(
+                                  onPressed: _onResumeButtonPressed,
+                                  child: Text(isPomodoro ? 'Resume' : 'Resume'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              SizedBox(height: 10),
+
+                              // Finish button
+                              if (_isRunning)
+                                ElevatedButton(
+                                  onPressed: _completeTask,
+                                  child: Text("FINISH"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              SizedBox(height: 10),
+
+                              Text(
+                                "Timer is default",
+                                style: TextStyle(color: Colors.white, fontSize: 12),
+                              ),
+
+                              SizedBox(height: 10),
+
+                              // Wrap for Timer, Stopwatch, Pomodoro (disabled if _isCompleted is true)
+                              Wrap(
+                                spacing: 8.0, // Adds space between each item
+                                children: [
+                                  GestureDetector(
+                                    onTap: !_isCompleted ? () { _resetToStartScreen(); } : null, // Disable if completed
+                                    child: Text(
+                                      "TIMER |",
+                                      style: TextStyle(
+                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: !_isCompleted ? () { _resetToStartScreen(); } : null, // Disable if completed
+                                    child: Text(
+                                      "STOPWATCH |",
+                                      style: TextStyle(
+                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: !_isCompleted ? _startPomodoroTimer : null, // Disable if completed
+                                    child: Text(
+                                      "POMODORO",
+                                      style: TextStyle(
+                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: Center(
+                    ),
+
+                    SizedBox(width: 16),
+                    // Tasks Section
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Color(0xff003039),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _formatTime(_seconds),
-                              style: TextStyle(fontSize: 50, color: Colors.white),
+                              "TASK FOR THIS SESSION",
+                              style: TextStyle(fontSize: 18, color: Colors.white),
+                            ),
+                            SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Icon(
+                                  _isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  widget.taskTitle,
+                                  style: TextStyle(fontSize: 16, color: Colors.white),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 20),
-                            if (!_isRunning)
-                              ElevatedButton(
-                                onPressed: _startPomodoroTimer,
-                                child: Text("START"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                ),
-                              ),
-                            if (_isRunning && !_isPaused)
-                              ElevatedButton(
-                                onPressed: _pauseTimer,
-                                child: Text("PAUSE"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                ),
-                              ),
-                            if (_isPaused)
-                              ElevatedButton(
-                                onPressed: _resumeTimer,
-                                child: Text("RESUME"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                ),
-                              ),
-                            SizedBox(height: 10),
-                            if (_isRunning)
-                              ElevatedButton(
-                                onPressed: _completeTask,
-                                child: Text("FINISH"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                ),
-                              ),
-                            SizedBox(height: 10),
                             Text(
-                              "Timer is default",
-                              style: TextStyle(color: Colors.white, fontSize: 12),
+                              "UNCOMPLETED TASKS",
+                              style: TextStyle(fontSize: 18, color: Colors.white),
                             ),
                             SizedBox(height: 10),
-                            GestureDetector(
-                              onTap: _startPomodoroTimer,
-                              child: Text(
-                                "TIMER | STOPWATCH | POMODORO",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
+                            ...uncompletedTasks.map((task) {
+                              return ListTile(
+                                title: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle_outlined,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      task['title'],
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  task['date'] != null ? DateFormat('MM-dd-yyyy').format(task['date']) : 'No date set',
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                              );
+                            }).toList(),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 16),
-                  // Tasks Section
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Color(0xff003039),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "TASK FOR THIS SESSION",
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
-                          SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Icon(
-                                _isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                widget.taskTitle,
-                                style: TextStyle(fontSize: 16, color: Colors.white),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            DateFormat('EEE, d MMM').format(widget.taskDate),
-                            style: TextStyle(fontSize: 16, color: Colors.white),
-                          ),
-                          SizedBox(height: 20),
-                          // Uncompleted Tasks Section
-                          Text(
-                            "UNCOMPLETED TASKS",
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
-                          Expanded(
-                            child: ListView.builder(
-                              itemCount: uncompletedTasks.length,
-                              itemBuilder: (context, index) {
-                                final task = uncompletedTasks[index];
-                                return ListTile(
-                                  leading: Icon(Icons.circle_outlined, color: Colors.white),
-                                  title: Text(
-                                    task['title'],
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  subtitle: Text(
-                                    DateFormat('EEE, d MMM').format(task['date']),
-                                    style: TextStyle(color: Colors.white70),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Placeholder for HeaderSection component
-class HeaderSection extends StatelessWidget {
-  final Function(String) onLinkPressed;
-
-  HeaderSection({required this.onLinkPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16.0),
-      color: Color(0xff003039),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          GestureDetector(
-            onTap: () => onLinkPressed('studysync'),
-            child: Text('STUDYSYNC', style: TextStyle(color: Colors.white)),
-          ),
-          GestureDetector(
-            onTap: () => onLinkPressed('friends'),
-            child: Text('FRIENDS', style: TextStyle(color: Colors.white)),
-          ),
-          GestureDetector(
-            onTap: () => onLinkPressed('groups'),
-            child: Text('GROUPS', style: TextStyle(color: Colors.white)),
-          ),
-          GestureDetector(
-            onTap: () => onLinkPressed('profile'),
-            child: Text('PROFILE', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

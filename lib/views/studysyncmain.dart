@@ -6,11 +6,16 @@ import 'package:provider/provider.dart';
 import 'package:untitled/views/GroupsPage.dart';
 import 'package:untitled/views/ProfilePage.dart';
 import 'package:untitled/views/StartStudyingPage.dart';
+import '../models/todo_task.dart';
 import '../providers/timer_provider.dart';
+import '../utils/color.dart';
+import '../widgets/Advertisment_Section.dart';
+import '../widgets/DailyStreak_Section.dart';
+import '../widgets/Header_Section.dart';
+import '../widgets/TimeSpent_Section.dart';
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 import 'dart:async';
-import 'package:untitled/models/todo_task_model.dart'; // Import your model
 
 
 class StudySyncDashboard extends StatefulWidget {
@@ -64,18 +69,20 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
                 return false;
               },
               child: Scaffold(
-                backgroundColor: Color(0xFFfae5d3),
+                backgroundColor: AppColors.backgroundColor,
                 body: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Use the HeaderSection here
                         HeaderSection(onLinkPressed: onSectionChange),
                         SizedBox(height: 20),
                         Expanded(
                           child: Row(
                             children: [
+                              // Render different sections based on the selected link
                               if (selectedSection == 'studysync') ...[
                                 Expanded(flex: 2, child: ToDoSection()),
                                 SizedBox(width: 20),
@@ -110,74 +117,6 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
   }
 }
 
-// Header Section
-class HeaderSection extends StatelessWidget {
-  final Function(String) onLinkPressed;
-
-  const HeaderSection({required this.onLinkPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    // Get the screen width
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    // Adjust the main text and link sizes dynamically based on screen width
-    double mainTextSize = screenWidth * 0.07; // Adjust based on screen width
-    double linkTextSize = screenWidth * 0.045; // Adjust for link text
-
-    // Adjust spacing dynamically with a max and min limit
-    double spacing = screenWidth * 0.03; // Smaller spacing for smaller screens
-
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: spacing, // Spacing between elements
-      runSpacing: 10,  // Spacing between rows when wrapping occurs
-      children: [
-        GestureDetector(
-          onTap: () {
-            onLinkPressed('studysync');
-          },
-          child: Text(
-            'STUDYSYNC',
-            style: TextStyle(
-              fontSize: mainTextSize.clamp(20, 30), // Set a min and max size
-              fontWeight: FontWeight.bold,
-              color: Colors.red,
-            ),
-          ),
-        ),
-        HeaderLink(text: 'Friends', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
-        HeaderLink(text: 'Groups', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
-        HeaderLink(text: 'Profile', fontSize: linkTextSize, onLinkPressed: onLinkPressed),
-      ],
-    );
-  }
-}
-
-class HeaderLink extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final Function(String) onLinkPressed;
-
-  const HeaderLink({required this.text, required this.fontSize, required this.onLinkPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        onLinkPressed(text.toLowerCase());
-      },
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: fontSize.clamp(14, 22), // Clamp font size between 14 and 22
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
-      ),
-    );
-  }
-}
 
 class ToDoSection extends StatefulWidget {
   @override
@@ -387,13 +326,18 @@ class _ToDoItemState extends State<ToDoItem> {
           if (task?['date'] is Timestamp) {
             effectiveDate = (task['date'] as Timestamp).toDate();
           } else if (task?['date'] is String) {
-            effectiveDate = DateFormat('MM-dd-yyyy').parse(task['date']);
+            try {
+              effectiveDate = DateFormat('MM-dd-yyyy').parse(task['date']);
+            } catch (e) {
+              print('Error parsing date string: $e');
+              effectiveDate = DateTime.now(); // Set a default date or handle the error as needed
+            }
           }
 
           return Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.red,
+                backgroundColor: Colors.white,
                 radius: 8,
               ),
               SizedBox(width: 10),
@@ -448,86 +392,6 @@ class _ToDoItemState extends State<ToDoItem> {
   }
 }
 
-
-class DailyStreakSection extends StatefulWidget {
-  @override
-  _DailyStreakSectionState createState() => _DailyStreakSectionState();
-}
-
-class _DailyStreakSectionState extends State<DailyStreakSection> {
-  int streakNumber = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchStreakNumber();
-  }
-  Future<void> _fetchStreakNumber() async {
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    String userId = currentUser?.uid ?? '';
-
-    if (userId.isNotEmpty) {
-      try {
-        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-
-        if (userSnapshot.exists && userSnapshot.data() != null) {
-          Map<String, dynamic> userData = userSnapshot.data() as Map<String, dynamic>;
-
-          DateTime lastStreakUpdate = userData['lastStreakUpdate'] != null
-              ? (userData['lastStreakUpdate'] as Timestamp).toDate()
-              : DateTime.fromMillisecondsSinceEpoch(0);
-
-          DateTime currentTime = DateTime.now();
-          Duration difference = currentTime.difference(lastStreakUpdate);
-
-          if (difference.inHours >= 24) {
-            int newStreakNumber = (userData['streakNumber'] ?? 0) + 1;
-
-            await FirebaseFirestore.instance.collection('users').doc(userId).update({
-              'streakNumber': newStreakNumber,
-              'lastStreakUpdate': Timestamp.fromDate(currentTime),
-            });
-
-            if (mounted) {
-              setState(() {
-                streakNumber = newStreakNumber;
-              });
-            }
-          } else {
-            if (mounted) {
-              setState(() {
-                streakNumber = userData['streakNumber'] ?? 0;
-              });
-            }
-          }
-        }
-      } catch (e) {
-        print('Error fetching streak: $e');
-      }
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'DAILY STREAK: $streakNumber 🔥',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 5),
-        Text(
-          '* Streak counter: Increases with consecutive daily logins. Resets if a day is missed.',
-          style: TextStyle(fontSize: 12),
-        ),
-      ],
-    );
-  }
-}
-
 class StatsSection extends StatelessWidget {
   final ValueNotifier<Duration> sessionDurationNotifier;
 
@@ -550,60 +414,6 @@ class StatsSection extends StatelessWidget {
         StartStudyingButton(),
       ],
     );
-  }
-}
-
-class TimeSpentSection extends StatelessWidget {
-  final Duration totalTimeSpentThisWeek;
-
-  TimeSpentSection({required this.totalTimeSpentThisWeek});
-
-  @override
-  Widget build(BuildContext context) {
-    String formattedTimeSpent = _formatDuration(totalTimeSpentThisWeek);
-
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 4,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Time Spent This Week:',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 10),
-          Text(
-            formattedTimeSpent,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.black54,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    int hours = duration.inHours;
-    int minutes = duration.inMinutes.remainder(60);
-    int seconds = duration.inSeconds.remainder(60);
-    return '$hours hours, $minutes minutes, $seconds seconds';
   }
 }
 
@@ -658,20 +468,6 @@ class StartStudyingButton extends StatelessWidget {
   }
 }
 
-class AdvertisementSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      color: Colors.grey[300],
-      child: Center(
-        child: Text(
-          'Advertisement',
-          style: TextStyle(fontSize: 18, color: Colors.black),
-        ),
-      ),
-    );
-  }
-}
+
 
 

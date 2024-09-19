@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '../providers/Friend_Provider.dart'; // Import your FriendProvider
+import '../providers/Friend_Provider.dart';
 
 class ProfilePage extends StatefulWidget {
   @override

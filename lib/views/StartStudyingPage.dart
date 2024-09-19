@@ -57,7 +57,6 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
     }
   }
 
-
   void _filterTasks() {
     setState(() {
       filteredTodoList = todoList.where((task) {

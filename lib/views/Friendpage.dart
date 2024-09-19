@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/Friend_Provider.dart';  // Import your FriendProvider
+import '../providers/Friend_Provider.dart';
+import '../utils/color.dart';  // Import your FriendProvider
 
 class FriendsPage extends StatelessWidget {
   final TextEditingController _usernameController = TextEditingController();

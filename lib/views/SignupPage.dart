@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled/views/studysyncmain.dart';
 
+import '../utils/color.dart';
+
 class StudySyncSignupApp extends StatefulWidget {
   @override
   _StudySyncSignupAppState createState() => _StudySyncSignupAppState();
@@ -51,7 +53,6 @@ class _StudySyncSignupAppState extends State<StudySyncSignupApp> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,7 +61,7 @@ class _StudySyncSignupAppState extends State<StudySyncSignupApp> {
         backgroundColor: Color(0xFFc1121f),
       ),
       body: Container(
-        color: Color(0xFFfae5d3),
+        color: AppColors.backgroundColor,
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
