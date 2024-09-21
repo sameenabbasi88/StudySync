@@ -47,6 +47,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Group ID is empty');
     }
   }
+
   void _showTaskPopup() {
     showDialog(
       context: context,
@@ -60,7 +61,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
             onTaskAdded: (newTask) {
               setState(() {
                 tasks.add(newTask); // Update the local task list
-                _updateTodoTasks([newTask]); // Ensure new tasks are pushed to followers
+                _updateTodoTasks(
+                    [newTask]); // Ensure new tasks are pushed to followers
               });
             },
             groupId: widget.groupId, // Pass the group ID
@@ -79,8 +81,10 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
       if (groupSnapshot.exists) {
         setState(() {
-          groupName = groupSnapshot['groupname'] ?? 'Unknown Group'; // Fetch the group name
-          creatorId = groupSnapshot['owner'] ?? ''; // Fetch the creator's user ID
+          groupName = groupSnapshot['groupname'] ??
+              'Unknown Group'; // Fetch the group name
+          creatorId =
+              groupSnapshot['owner'] ?? ''; // Fetch the creator's user ID
           _fetchCreatorUsername(creatorId); // Fetch the creator's username
           _checkIfFollowing(); // Check if the user is following the group
           _checkIfCreator(); // Check if the current user is the creator
@@ -102,7 +106,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
       if (userSnapshot.exists) {
         setState(() {
-          creatorUsername = userSnapshot['username'] ?? 'Unknown Creator'; // Fetch the username
+          creatorUsername = userSnapshot['username'] ??
+              'Unknown Creator'; // Fetch the username
         });
       } else {
         print('User document does not exist');
@@ -147,7 +152,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
-
   void _showMembersDialog() {
     showDialog(
       context: context,
@@ -157,7 +161,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Admin: $creatorUsername', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Admin: $creatorUsername',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               SizedBox(height: 10),
               ...members.map((member) => Text(member)).toList(),
             ],
@@ -174,7 +179,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       },
     );
   }
-
 
   Future<void> _fetchTasks() async {
     try {
@@ -203,7 +207,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
   Future<void> _checkIfCreator() async {
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser; // Get current user from Firebase Auth
+      User? currentUser = FirebaseAuth
+          .instance.currentUser; // Get current user from Firebase Auth
 
       if (currentUser != null) {
         String userId = currentUser.uid; // Retrieve the current user's ID
@@ -228,10 +233,12 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
   Future<void> _checkIfFollowing() async {
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser; // Get current user from Firebase Auth
+      User? currentUser = FirebaseAuth
+          .instance.currentUser; // Get current user from Firebase Auth
 
       if (currentUser != null) {
-        String userId = currentUser.uid; // Retrieve the current user's ID from Firebase Authentication
+        String userId = currentUser
+            .uid; // Retrieve the current user's ID from Firebase Authentication
 
         DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
             .collection('users')
@@ -242,7 +249,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
           List<dynamic> followingGroups = userSnapshot['joinedgroup'] ?? [];
           setState(() {
             // Ensure groupId is compared as a string
-            isFollowing = followingGroups.any((group) => group['groupId'].toString() == widget.groupId.toString());
+            isFollowing = followingGroups.any((group) =>
+                group['groupId'].toString() == widget.groupId.toString());
           });
         }
       }
@@ -300,13 +308,19 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         List<dynamic> followers = groupSnapshot['followers'] ?? [];
 
         for (var follower in followers) {
-          String followerId = follower['userId'].toString(); // Ensure userId is String
+          String followerId =
+              follower['userId'].toString(); // Ensure userId is String
 
           // Update todoTasks for each follower
-          await FirebaseFirestore.instance.collection('todoTasks').doc(followerId).set({
+          await FirebaseFirestore.instance
+              .collection('todoTasks')
+              .doc(followerId)
+              .set({
             'Todotasks': FieldValue.arrayUnion(newTasks.map((taskData) {
-              DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
-              int taskPriority = _calculateTaskPriority(date); // Calculate the priority
+              DateTime date =
+                  DateTime.now().add(Duration(days: 7)); // Example date
+              int taskPriority =
+                  _calculateTaskPriority(date); // Calculate the priority
               String formattedDate = DateFormat('MM-dd-yyyy').format(date);
 
               return {
@@ -331,30 +345,40 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       if (currentUser != null) {
         String userId = currentUser.uid;
 
-        DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(userId);
-        DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+        DocumentReference userDoc =
+            FirebaseFirestore.instance.collection('users').doc(userId);
+        DocumentReference groupDoc =
+            FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 
         if (isFollowing) {
           // Unfollow logic
           await userDoc.update({
-            'joinedgroup': FieldValue.arrayRemove([{
-              'groupId': widget.groupId,
-              'groupName': groupName,
-            }]),
+            'joinedgroup': FieldValue.arrayRemove([
+              {
+                'groupId': widget.groupId,
+                'groupName': groupName,
+              }
+            ]),
           });
           await groupDoc.update({
-            'followers': FieldValue.arrayRemove([{'userId': userId}]),
+            'followers': FieldValue.arrayRemove([
+              {'userId': userId}
+            ]),
           });
         } else {
           // Follow logic
           await userDoc.update({
-            'joinedgroup': FieldValue.arrayUnion([{
-              'groupId': widget.groupId,
-              'groupName': groupName,
-            }]),
+            'joinedgroup': FieldValue.arrayUnion([
+              {
+                'groupId': widget.groupId,
+                'groupName': groupName,
+              }
+            ]),
           });
           await groupDoc.update({
-            'followers': FieldValue.arrayUnion([{'userId': userId}]),
+            'followers': FieldValue.arrayUnion([
+              {'userId': userId}
+            ]),
           });
         }
 
@@ -367,9 +391,9 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
-
   void _copyGroupLink() {
-    final String groupLink = "https://yourapp.com/group/${widget.groupId}"; // Example group link
+    final String groupLink =
+        "https://yourapp.com/group/${widget.groupId}"; // Example group link
     Clipboard.setData(ClipboardData(text: groupLink));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Group link copied to clipboard!')),
@@ -385,7 +409,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
           child: Wrap(
             children: [
               ListTile(
-                leading: Icon(Icons.share), // You can replace this with a specific icon
+                leading: Icon(
+                    Icons.share), // You can replace this with a specific icon
                 title: Text('Share on WhatsApp'),
                 onTap: () {
                   _shareLink('WhatsApp');
@@ -416,13 +441,12 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   }
 
   void _shareLink(String platform) {
-    final String groupLink = "https://yourapp.com/group/${widget.groupId}"; // Example group link
+    final String groupLink =
+        "https://yourapp.com/group/${widget.groupId}"; // Example group link
     String message = "Check out this group: $groupLink";
 
     Share.share(message, subject: 'Share this group link');
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -477,7 +501,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                             ElevatedButton(
                               onPressed: _toggleFollow,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isFollowing ? Colors.grey : Colors.green,
+                                backgroundColor:
+                                    isFollowing ? Colors.grey : Colors.green,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -490,17 +515,17 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                             PopupMenuButton<String>(
                               icon: Icon(Icons.more_horiz, color: Colors.white),
                               onSelected: (value) {
-                                if (value == 'Members') {
-                                  _fetchMembers(); // Fetch and show members
-                                }else if (value == 'Copy Link') {
-    _copyGroupLink(); // Define a method to copy the link
-    } else if (value == 'Members') {
-    _showMembersDialog(); // Define a method to show the list of members
-    }
-    },
-
+                                if (value == 'Share') {
+                                  _showShareOptions(); // Fetch and show members
+                                } else if (value == 'Copy Link') {
+                                  _copyGroupLink(); // Define a method to copy the link
+                                } else if (value == 'Members') {
+                                  _showMembersDialog(); // Define a method to show the list of members
+                                }
+                              },
                               itemBuilder: (BuildContext context) {
-                                return {'Share', 'Copy Link', 'Members'}.map((String choice) {
+                                return {'Share', 'Copy Link', 'Members'}
+                                    .map((String choice) {
                                   return PopupMenuItem<String>(
                                     value: choice,
                                     child: Text(choice),
@@ -508,8 +533,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                                 }).toList();
                               },
                             )
-
-
                           ],
                         ),
                       ),
@@ -534,12 +557,14 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
-                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
                             ),
                             onPressed: _showTaskPopup,
                             child: Text(
                               'Manage Tasks',
-                              style: TextStyle(fontSize: 20, color: Colors.white),
+                              style:
+                                  TextStyle(fontSize: 20, color: Colors.white),
                             ),
                           ),
                         ),
@@ -547,7 +572,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -556,13 +580,13 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   }
 }
 
-
 class TaskManager extends StatefulWidget {
   final List<Task> tasks;
   final ValueChanged<Task> onTaskAdded;
   final String groupId;
 
-  TaskManager({required this.tasks, required this.onTaskAdded, required this.groupId});
+  TaskManager(
+      {required this.tasks, required this.onTaskAdded, required this.groupId});
 
   @override
   _TaskManagerState createState() => _TaskManagerState();
@@ -598,7 +622,8 @@ class _TaskManagerState extends State<TaskManager> {
       int taskPriority = _calculateTaskPriority(dueDate);
 
       // Add the new task to Firestore
-      DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+      DocumentReference groupDoc =
+          FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       await groupDoc.update({
         'tasks': FieldValue.arrayUnion([
           {
@@ -621,8 +646,6 @@ class _TaskManagerState extends State<TaskManager> {
     int daysUntilDue = dueDate.difference(today).inDays;
     return daysUntilDue <= 7 ? 1 : 2; // High priority if within 7 days
   }
-
-
 
   void _showAddTaskDialog() {
     showDialog(
@@ -699,11 +722,13 @@ class _TaskManagerState extends State<TaskManager> {
             ],
           ),
           SizedBox(height: 20),
-          ...taskNames.map((task) => TaskPopupItem(
-            task: task,
-            groupId: widget.groupId,
-            onTaskDeleted: _handleTaskDeletion,
-          )).toList(),
+          ...taskNames
+              .map((task) => TaskPopupItem(
+                    task: task,
+                    groupId: widget.groupId,
+                    onTaskDeleted: _handleTaskDeletion,
+                  ))
+              .toList(),
           SizedBox(height: 20),
           Align(
             alignment: Alignment.bottomRight,
@@ -753,7 +778,8 @@ class TaskPopupItem extends StatelessWidget {
 
     if (confirm == true) {
       try {
-        DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(groupId);
+        DocumentReference groupDoc =
+            FirebaseFirestore.instance.collection('groups').doc(groupId);
         await groupDoc.update({
           'tasks': FieldValue.arrayRemove([
             {
