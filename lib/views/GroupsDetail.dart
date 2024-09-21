@@ -516,11 +516,11 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                               icon: Icon(Icons.more_horiz, color: Colors.white),
                               onSelected: (value) {
                                 if (value == 'Share') {
-                                  _showShareOptions(); // Fetch and show members
+                                  _showShareOptions();
                                 } else if (value == 'Copy Link') {
-                                  _copyGroupLink(); // Define a method to copy the link
+                                  _copyGroupLink();
                                 } else if (value == 'Members') {
-                                  _showMembersDialog(); // Define a method to show the list of members
+                                  _fetchMembers(); // Define a method to show the list of members
                                 }
                               },
                               itemBuilder: (BuildContext context) {
