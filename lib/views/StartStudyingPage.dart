@@ -39,23 +39,25 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
           todoList = tasks.map((task) {
             return {
               'title': task['title'],
-              'date': (task['date'] as Timestamp).toDate(), // Convert Timestamp to DateTime
+              'date': task['date'] is Timestamp
+                  ? (task['date'] as Timestamp).toDate() // Timestamp to DateTime
+                  : DateFormat('MM-dd-yyyy').parse(task['date']), // String to DateTime
               'priority': task['priority'] ?? 0,
             };
           }).toList()
             ..sort((a, b) {
-              // Sort by date first (ascending), then by priority (descending)
               int dateComparison = a['date'].compareTo(b['date']);
               if (dateComparison != 0) return dateComparison;
               return b['priority'].compareTo(a['priority']);
             });
-          _filterTasks(); // Apply initial filter
+          _filterTasks();
         });
       }
     } else {
       print('No user is logged in.');
     }
   }
+
 
   void _filterTasks() {
     setState(() {
@@ -165,7 +167,6 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
     }
   }
 
-
   int _calculatePriority(DateTime date) {
     DateTime now = DateTime.now();
     Duration difference = date.difference(now);
@@ -200,6 +201,7 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
       print('No user is logged in.');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
