@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +14,7 @@ import '../widgets/Advertisment_Section.dart';
 import '../widgets/DailyStreak_Section.dart';
 import '../widgets/Header_Section.dart';
 import '../widgets/TimeSpent_Section.dart';
+import '../widgets/Web_Helper.dart';
 import 'Friendpage.dart';
 import 'TimerScreen.dart';
 import 'dart:async';
@@ -30,18 +32,45 @@ class StudySyncDashboard extends StatefulWidget {
 class _StudySyncDashboardState extends State<StudySyncDashboard> {
   String selectedSection = 'studysync'; // Default section
   late TimerProvider timerProvider;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    timerProvider = TimerProvider(); // Initialize TimerProvider
-    timerProvider.startTimer(); // Start the timer when the widget is initialized
+    timerProvider = TimerProvider();
+    timerProvider.startTimer();
+    _setUserOnlineStatus(true);
+
+    if (kIsWeb) {
+      addBeforeUnloadListener(() {
+        _setUserOnlineStatus(false);
+      });
+    }
   }
 
   @override
   void dispose() {
-    timerProvider.stopTimer(); // Stop the timer when the widget is disposed
+    timerProvider.stopTimer();
+    _setUserOnlineStatus(false);
+
+    if (kIsWeb) {
+      removeBeforeUnloadListener();
+    }
+
     super.dispose();
+  }
+
+
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update online status when dependencies change (e.g., navigating to a new page)
+    _setUserOnlineStatus(true);
+  }
+
+  Future<void> _setUserOnlineStatus(bool isOnline) async {
+    await _firestore.collection('users').doc(widget.userId).update({
+      'isOnline': isOnline,
+    });
   }
 
   void onSectionChange(String section) {
@@ -50,73 +79,67 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
     });
   }
 
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _setUserOnlineStatus(false);
+    } else if (state == AppLifecycleState.resumed) {
+      _setUserOnlineStatus(true);
+    }
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<TimerProvider>.value(
       value: timerProvider,
-      child: Consumer<TimerProvider>(
-        builder: (context, timerProvider, child) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: WillPopScope(
-              onWillPop: () async {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => StudySyncDashboard(userId: widget.userId),
-                  ),
-                );
-                return false;
-              },
-              child: Scaffold(
-                backgroundColor: AppColors.backgroundColor,
-                body: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Use the HeaderSection here
-                        HeaderSection(onLinkPressed: onSectionChange),
-                        SizedBox(height: 20),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              // Render different sections based on the selected link
-                              if (selectedSection == 'studysync') ...[
-                                Expanded(flex: 2, child: ToDoSection()),
-                                SizedBox(width: 20),
-                                Expanded(
-                                  flex: 3,
-                                  child: StatsSection(sessionDurationNotifier: timerProvider.sessionDurationNotifier),
-                                ),
-                              ] else if (selectedSection == 'friends') ...[
-                                Expanded(child: FriendsPage()),
-                              ] else if (selectedSection == 'groups') ...[
-                                Expanded(child: GroupsPage()),
-                              ] else if (selectedSection == 'profile') ...[
-                                Expanded(child: ProfilePage()),
-                              ],
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        if (selectedSection == 'studysync') ...[
-                          AdvertisementSection(),
+      child: Consumer<TimerProvider>(builder: (context, timerProvider, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: Scaffold(
+            backgroundColor: AppColors.backgroundColor,
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    HeaderSection(onLinkPressed: onSectionChange),
+                    SizedBox(height: 20),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          if (selectedSection == 'studysync') ...[
+                            Expanded(flex: 2, child: ToDoSection()),
+                            SizedBox(width: 20),
+                            Expanded(
+                              flex: 3,
+                              child: StatsSection(sessionDurationNotifier: timerProvider.sessionDurationNotifier),
+                            ),
+                          ] else if (selectedSection == 'friends') ...[
+                            Expanded(child: FriendsPage()),
+                          ] else if (selectedSection == 'groups') ...[
+                            Expanded(child: GroupsPage()),
+                          ] else if (selectedSection == 'profile') ...[
+                            Expanded(child: ProfilePage()),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+                    SizedBox(height: 20),
+                    if (selectedSection == 'studysync') ...[
+                      AdvertisementSection(),
+                    ],
+                  ],
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }),
     );
   }
 }
-
 
 class ToDoSection extends StatefulWidget {
   @override

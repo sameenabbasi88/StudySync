@@ -21,7 +21,7 @@ class TimeSpentSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Time Spent This Week:',
+            'Total Time Spent :',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,

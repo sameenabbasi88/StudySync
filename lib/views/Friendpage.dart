@@ -64,10 +64,7 @@ class FriendsPage extends StatelessWidget {
 
                           return ListTile(
                             leading: CircleAvatar(
-                              child: Icon(
-                                Icons.person,
-                                color: Colors.white,
-                              ),
+                              child: Icon(Icons.person, color: Colors.white),
                               backgroundColor: Colors.blue,
                             ),
                             title: Text(name, style: TextStyle(color: Colors.white)),
@@ -111,33 +108,7 @@ class FriendsPage extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 8),
-                    Expanded(
-                      child: friendProvider.addedFriends.isEmpty
-                          ? Center(
-                        child: Text(
-                          'No friends added',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      )
-                          : ListView.builder(
-                        itemCount: friendProvider.addedFriends.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            leading: CircleAvatar(
-                              child: Icon(Icons.person, color: Colors.white),
-                              backgroundColor: Colors.blue,
-                            ),
-                            title: Text(
-                              friendProvider.addedFriends[index],
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    friendProvider.buildAddedFriendsList(context), // Call the method here
                     if (friendProvider.getErrorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16.0),

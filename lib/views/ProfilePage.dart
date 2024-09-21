@@ -32,8 +32,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
     if (userDoc.exists) {
       final data = userDoc.data()!;
-      _usernameController.text = data['username'] ?? '';
-      _favoriteSubjectController.text = data['favoriteSubject'] ?? '';
+      _usernameController.text = data['username'] ?? 'Unknown User';
+      _favoriteSubjectController.text = data['favoriteSubject'] ?? 'Not set';
+      setState(() {
+        _profilePhotoUrl = data['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+      });
     }
   }
 
@@ -51,12 +54,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: InputDecoration(labelText: 'Username'),
               ),
               TextField(
-                controller: TextEditingController()..text = DateFormat('yyyy-MM-dd').format(DateTime.now()), // Default to current date
+                controller: TextEditingController()..text = DateFormat('yyyy-MM-dd').format(DateTime.now()),
                 decoration: InputDecoration(labelText: 'Joined Date'),
                 enabled: false,
               ),
               TextField(
-                controller: TextEditingController()..text = 'Your Group Names Here', // Example placeholder
+                controller: TextEditingController()..text = 'Your Group Names Here',
                 decoration: InputDecoration(labelText: 'Groups'),
                 enabled: false,
               ),
@@ -69,7 +72,6 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () async {
-                // Save changes to Firestore
                 final username = _usernameController.text;
                 final favoriteSubject = _favoriteSubjectController.text;
 
@@ -105,6 +107,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (result != null && result.files.single.bytes != null) {
         final imageData = result.files.single.bytes!;
+
+        // Validate image data (optional)
+        if (imageData.length < 8 || imageData[0] != 0xFF || imageData[1] != 0xD8) {
+          // Basic validation for JPEG files
+          print('Selected file is not a valid image.');
+          return;
+        }
+
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile_photos/${_auth.currentUser!.uid}.jpg');
@@ -133,6 +143,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Consumer<FriendProvider>(
@@ -140,9 +151,6 @@ class _ProfilePageState extends State<ProfilePage> {
         final addedFriends = friendProvider.addedFriends;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text('Profile'),
-          ),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -197,20 +205,21 @@ class _ProfilePageState extends State<ProfilePage> {
                                     return Center(child: Text('No profile data available'));
                                   }
 
-                                  final userDoc = snapshot.data!;
-                                  Timestamp timestamp = userDoc['date'];
+                                  final userDoc = snapshot.data!.data() as Map<String, dynamic>;
+                                  Timestamp timestamp = userDoc.containsKey('date') ? userDoc['date'] : Timestamp.now();
                                   DateTime joinedDate = timestamp.toDate();
                                   String formattedDate = DateFormat('yyyy-MM-dd').format(joinedDate);
 
-                                  // Fetch the profile photo URL if it exists, otherwise use a placeholder
-                                  String profilePhotoUrl = userDoc['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+                                  String profilePhotoUrl = userDoc.containsKey('profilePhotoUrl') ? userDoc['profilePhotoUrl'] : 'https://via.placeholder.com/150';
 
-                                  // Fetch the groups from the joinedgroup array, only show 'groupName'
-                                  List<dynamic> joinedGroups = userDoc['joinedgroup'] ?? [];
-                                  List<String> groupNames = joinedGroups
-                                      .map((group) => group['groupName'] as String) // Extract 'groupName'
-                                      .toList();
-                                  String groupsList = groupNames.join(', '); // Convert to a comma-separated string
+                                  List<dynamic> joinedGroups = userDoc.containsKey('joinedgroup') ? userDoc['joinedgroup'] : [];
+                                  List<String> groupNames = joinedGroups.map((group) {
+                                    if (group is Map<String, dynamic> && group.containsKey('groupName')) {
+                                      return group['groupName'] as String;
+                                    }
+                                    return 'Unknown Group';
+                                  }).toList();
+                                  String groupsList = groupNames.join(', ');
 
                                   return Container(
                                     padding: EdgeInsets.all(16),
@@ -222,7 +231,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Username: ${userDoc['username'] ?? 'Unknown User'}',
+                                              'Username: ${userDoc.containsKey('username') ? userDoc['username'] : 'Unknown User'}',
                                               style: TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
@@ -236,15 +245,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                           ],
                                         ),
                                         Text(
-                                          'Joined: $formattedDate', // Joined date
+                                          'Joined: $formattedDate',
                                           style: TextStyle(fontSize: 16, color: Colors.black87),
                                         ),
                                         Text(
-                                          'In Groups: $groupsList', // Groups
+                                          'In Groups: $groupsList',
                                           style: TextStyle(fontSize: 16, color: Colors.black87),
                                         ),
                                         Text(
-                                          'Favorite Subject: ${userDoc['favoriteSubject'] ?? 'Not set'}', // Favorite subject
+                                          'Favorite Subject: ${userDoc.containsKey('favoriteSubject') ? userDoc['favoriteSubject'] : 'Not set'}',
                                           style: TextStyle(fontSize: 16, color: Colors.black87),
                                         ),
                                       ],
@@ -280,30 +289,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                         SizedBox(height: 8),
-                        Expanded(
-                          child: addedFriends.isEmpty
-                              ? Center(
-                            child: Text(
-                              'No friends added',
-                              style: TextStyle(fontSize: 16, color: Colors.grey),
-                            ),
-                          )
-                              : ListView.builder(
-                            itemCount: addedFriends.length,
-                            itemBuilder: (context, index) {
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  child: Icon(Icons.person, color: Colors.white),
-                                  backgroundColor: Colors.blue,
-                                ),
-                                title: Text(
-                                  addedFriends[index],
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                        friendProvider.buildAddedFriendsList(context),
                       ],
                     ),
                   ),
@@ -316,4 +302,3 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-

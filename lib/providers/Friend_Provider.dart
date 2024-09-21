@@ -32,13 +32,16 @@ class FriendProvider with ChangeNotifier {
     _friendsList = querySnapshot.docs.map((doc) {
       return {
         'name': doc['username'],
-        'email': doc['email']
+        'email': doc['email'],
+        'isOnline': doc.data().containsKey('isOnline') ? doc['isOnline'] : false, // Default to false if not present
       };
     }).toList();
 
     _displayedFriendsList = List.from(_friendsList);
     notifyListeners();
   }
+
+
 
   void _fetchAddedFriends() async {
     if (userEmail != null) {
@@ -101,4 +104,58 @@ class FriendProvider with ChangeNotifier {
 
     notifyListeners();
   }
+
+  Widget buildAddedFriendsList(BuildContext context) {
+    return Expanded(
+      child: _addedFriends.isEmpty
+          ? Center(
+        child: Text(
+          'No friends added',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey,
+          ),
+        ),
+      )
+          : ListView.builder(
+        itemCount: _addedFriends.length,
+        itemBuilder: (context, index) {
+          final friend = _friendsList.firstWhere(
+                (f) => f['name'] == _addedFriends[index],
+            orElse: () => {'isOnline': false}, // Default to offline
+          );
+
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  child: Icon(Icons.person, color: Colors.white),
+                  backgroundColor: Colors.blue,
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: friend['isOnline'] ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            title: Text(
+              _addedFriends[index],
+              style: TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
+

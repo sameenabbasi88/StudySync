@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../providers/Friend_Provider.dart';
 import 'GroupsDetail.dart';
 
@@ -17,6 +16,7 @@ class _GroupsPageState extends State<GroupsPage> {
   TextEditingController searchController = TextEditingController(); // Controller for search
   String? selectedGroup;
   String searchQuery = ''; // Variable to hold search query
+
 
   @override
   Widget build(BuildContext context) {
@@ -136,33 +136,7 @@ class _GroupsPageState extends State<GroupsPage> {
                       ),
                     ),
                     SizedBox(height: 8),
-                    Expanded(
-                      child: friendProvider.addedFriends.isEmpty
-                          ? Center(
-                        child: Text(
-                          'No friends added',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      )
-                          : ListView.builder(
-                        itemCount: friendProvider.addedFriends.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            leading: CircleAvatar(
-                              child: Icon(Icons.person, color: Colors.white),
-                              backgroundColor: Colors.blue,
-                            ),
-                            title: Text(
-                              friendProvider.addedFriends[index],
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    friendProvider.buildAddedFriendsList(context),
                   ],
                 ),
               ),

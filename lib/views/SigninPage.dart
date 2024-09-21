@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:untitled/views/studysyncmain.dart';
 import 'SignupPage.dart';
 
-
 class StudySyncLoginApp extends StatelessWidget {
   const StudySyncLoginApp({super.key});
 
@@ -27,7 +26,6 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String? _sessionId; // Store the current session ID
   User? currentUser;
 
   @override
@@ -36,11 +34,19 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
     WidgetsBinding.instance.addObserver(this);
     currentUser = FirebaseAuth.instance.currentUser;
 
+    // Set online status on initialization
+    if (currentUser != null) {
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
+    // Set offline status when disposing
+    if (currentUser != null) {
+    }
+
     super.dispose();
   }
 
@@ -56,9 +62,9 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
       User? user = userCredential.user;
 
       if (user != null) {
-        // Update last login timestamp
+        // Update online status
         await _firestore.collection('users').doc(user.uid).update({
-          'lastLogin': FieldValue.serverTimestamp(),
+          'isOnline': true,
         });
         currentUser = user;
 
@@ -70,10 +76,32 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
         );
       }
     } catch (e) {
-      // Handle error
+      // Show error dialog for wrong credentials
+      showErrorDialog('Incorrect credentials. Please try again.');
       print('Error signing in: $e');
     }
   }
+
+  void showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Login Failed'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
