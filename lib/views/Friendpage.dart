@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/Friend_Provider.dart';
-import '../utils/color.dart';  // Import your FriendProvider
+import '../utils/color.dart';
 
 class FriendsPage extends StatelessWidget {
   final TextEditingController _usernameController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    final friendProvider = Provider.of<FriendProvider>(context);  // Access the provider
+    final friendProvider = Provider.of<FriendProvider>(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Set base font size and adjust for mobile view
+    double baseFontSize = 18;
+    double adjustedFontSize = screenWidth < 600 ? baseFontSize * 0.7 : baseFontSize;
+
+    // Adjust icon size based on screen width
+    double baseIconSize = 24;
+    double adjustedIconSize = screenWidth < 600 ? baseIconSize * 0.8 : baseIconSize;
 
     return Scaffold(
       body: Padding(
@@ -18,7 +27,7 @@ class FriendsPage extends StatelessWidget {
             Expanded(
               flex: 1,
               child: Container(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(8), // Reduced padding
                 decoration: BoxDecoration(
                   color: Color(0xff003039),
                   borderRadius: BorderRadius.circular(10),
@@ -29,12 +38,12 @@ class FriendsPage extends StatelessWidget {
                     Text(
                       'Search Friends',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: adjustedFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    SizedBox(height: 4), // Reduced space
                     TextField(
                       controller: _usernameController,
                       decoration: InputDecoration(
@@ -49,12 +58,13 @@ class FriendsPage extends StatelessWidget {
                         prefixIcon: Icon(
                           Icons.search,
                           color: Colors.white54,
+                          size: adjustedIconSize,
                         ),
                       ),
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.white, fontSize: adjustedFontSize),
                       onChanged: (value) => friendProvider.searchFriends(value),
                     ),
-                    SizedBox(height: 16),
+                    SizedBox(height: 8), // Reduced space
                     Expanded(
                       child: ListView.builder(
                         itemCount: friendProvider.displayedFriendsList.length,
@@ -63,15 +73,21 @@ class FriendsPage extends StatelessWidget {
                           final name = friend['name'];
 
                           return ListTile(
+                            contentPadding: EdgeInsets.symmetric(vertical: 0), // Remove vertical padding
                             leading: CircleAvatar(
-                              child: Icon(Icons.person, color: Colors.white),
+                              child: Icon(Icons.person, color: Colors.white, size: adjustedIconSize),
                               backgroundColor: Colors.blue,
                             ),
-                            title: Text(name, style: TextStyle(color: Colors.white)),
+                            title: Text(
+                              name,
+                              style: TextStyle(color: Colors.white, fontSize: adjustedFontSize),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             trailing: IconButton(
                               icon: Icon(
                                 friendProvider.addedFriends.contains(name) ? Icons.check_circle : Icons.add_circle,
                                 color: friendProvider.addedFriends.contains(name) ? Colors.blue : Colors.green,
+                                size: adjustedIconSize,
                               ),
                               onPressed: () {
                                 if (!friendProvider.addedFriends.contains(name)) {
@@ -102,13 +118,13 @@ class FriendsPage extends StatelessWidget {
                     Text(
                       'Added Friends (${friendProvider.addedFriends.length})',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: adjustedFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
                     SizedBox(height: 8),
-                    friendProvider.buildAddedFriendsList(context), // Call the method here
+                    friendProvider.buildAddedFriendsList(context),
                     if (friendProvider.getErrorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16.0),

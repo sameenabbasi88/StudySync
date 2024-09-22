@@ -21,6 +21,13 @@ class _GroupsPageState extends State<GroupsPage> {
   @override
   Widget build(BuildContext context) {
     final friendProvider = Provider.of<FriendProvider>(context);
+    final isMobile = MediaQuery.of(context).size.width < 600; // Example breakpoint for mobile
+
+    double groupTitleFontSize = isMobile ? 12 : 16; // Smaller font size for mobile
+    double friendTitleFontSize = isMobile ? 16 : 18; // Smaller font size for mobile
+    double groupCardFontSize = isMobile ? 12 : 18; // Smaller font size for mobile
+    double newGroupButtonFontSize = isMobile ? 12 : 16; // Smaller font size for mobile
+    double textFieldFontSize = isMobile ? 12 : 16;
 
     return Scaffold(
       body: Padding(
@@ -40,14 +47,12 @@ class _GroupsPageState extends State<GroupsPage> {
                     Text(
                       'Groups and Friends',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: groupTitleFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.teal,
                       ),
                     ),
                     SizedBox(height: 16),
-
-                    // Only show the search bar if no group is selected
                     if (selectedGroup == null)
                       TextField(
                         controller: searchController,
@@ -56,6 +61,7 @@ class _GroupsPageState extends State<GroupsPage> {
                             searchQuery = value.toLowerCase();
                           });
                         },
+                        style: TextStyle(fontSize: textFieldFontSize),
                         decoration: InputDecoration(
                           prefixIcon: Icon(Icons.search),
                           hintText: 'Search groups',
@@ -66,9 +72,7 @@ class _GroupsPageState extends State<GroupsPage> {
                           ),
                         ),
                       ),
-
                     SizedBox(height: 16),
-
                     Expanded(
                       child: selectedGroup == null
                           ? StreamBuilder<QuerySnapshot>(
@@ -92,30 +96,30 @@ class _GroupsPageState extends State<GroupsPage> {
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
                             ),
-                            itemCount: groups.length + 1, // Add one for the 'New Group' button
+                            itemCount: groups.length + 1,
                             itemBuilder: (context, index) {
                               if (index < groups.length) {
                                 final group = groups[index].data() as Map<String, dynamic>;
                                 return _buildGroupCard(
                                   group['groupname'],
                                   Color(group['color']),
-                                  group['groupid'], // Pass the groupid here
+                                  group['groupid'],
+                                  groupCardFontSize,
                                 );
                               } else {
-                                return _buildAddGroupButton();
+                                return _buildAddGroupButton(newGroupButtonFontSize);
                               }
                             },
                           );
                         },
                       )
-                          : TaskManagerApp(groupId: selectedGroup!), // Display TaskManagerApp if a group is selected
+                          : TaskManagerApp(groupId: selectedGroup!),
                     ),
                   ],
                 ),
               ),
             ),
             SizedBox(width: 16),
-            // The Friends list updated to use FriendProvider
             Expanded(
               flex: 1,
               child: Container(
@@ -128,9 +132,9 @@ class _GroupsPageState extends State<GroupsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Added Friends (${friendProvider.addedFriends.length})',  // Display number of added friends
+                      'Added Friends (${friendProvider.addedFriends.length})',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: friendTitleFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -147,11 +151,11 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
-  Widget _buildGroupCard(String groupName, Color color, String groupId) {
+  Widget _buildGroupCard(String groupName, Color color, String groupId, double fontSize) {
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedGroup = groupId; // Set the selectedGroup to the groupId
+          selectedGroup = groupId;
         });
       },
       child: Container(
@@ -164,7 +168,7 @@ class _GroupsPageState extends State<GroupsPage> {
             groupName,
             style: TextStyle(
               color: color == Colors.white ? Colors.black : Colors.white,
-              fontSize: 18,
+              fontSize: fontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -173,7 +177,7 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
-  Widget _buildAddGroupButton() {
+  Widget _buildAddGroupButton(double fontSize) {
     return GestureDetector(
       onTap: () {
         _showNewGroupPopup(context);
@@ -188,12 +192,17 @@ class _GroupsPageState extends State<GroupsPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.add, color: Colors.white, size: 30),
-              Text(
-                'New Group',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              SizedBox(height: 4),
+              Flexible(
+                child: Text(
+                  'New Group',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -202,6 +211,8 @@ class _GroupsPageState extends State<GroupsPage> {
       ),
     );
   }
+
+
 
   void _showNewGroupPopup(BuildContext context) {
     showDialog(

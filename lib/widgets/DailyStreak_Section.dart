@@ -16,16 +16,20 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
     super.initState();
     _fetchStreakNumber();
   }
+
   Future<void> _fetchStreakNumber() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
     String userId = currentUser?.uid ?? '';
 
     if (userId.isNotEmpty) {
       try {
-        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
+            .collection('users').doc(userId).get();
 
         if (userSnapshot.exists && userSnapshot.data() != null) {
-          Map<String, dynamic> userData = userSnapshot.data() as Map<String, dynamic>;
+          Map<String, dynamic> userData = userSnapshot.data() as Map<
+              String,
+              dynamic>;
 
           DateTime lastStreakUpdate = userData['lastStreakUpdate'] != null
               ? (userData['lastStreakUpdate'] as Timestamp).toDate()
@@ -37,7 +41,9 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
           if (difference.inHours >= 24) {
             int newStreakNumber = (userData['streakNumber'] ?? 0) + 1;
 
-            await FirebaseFirestore.instance.collection('users').doc(userId).update({
+            await FirebaseFirestore.instance.collection('users')
+                .doc(userId)
+                .update({
               'streakNumber': newStreakNumber,
               'lastStreakUpdate': Timestamp.fromDate(currentTime),
             });
@@ -60,22 +66,37 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
+    // Get the screen width to adjust the font size based on the device.
+    double screenWidth = MediaQuery
+        .of(context)
+        .size
+        .width;
+
+    // Adjust the font size based on the screen width (smaller for mobile).
+    double titleFontSize = screenWidth < 600
+        ? 18
+        : 18; // Smaller font for mobile
+    double descriptionFontSize = screenWidth < 600
+        ? 10
+        : 10; // Smaller font for mobile
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'DAILY STREAK: $streakNumber 🔥',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.bold,
           ),
         ),
         SizedBox(height: 5),
         Text(
           '* Streak counter: Increases with consecutive daily logins. Resets if a day is missed.',
-          style: TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: descriptionFontSize),
         ),
       ],
     );

@@ -26,11 +26,14 @@ class _HeaderSectionState extends State<HeaderSection> {
     double screenWidth = MediaQuery.of(context).size.width;
 
     // Adjust the main text and link sizes dynamically based on screen width
-    double mainTextSize = screenWidth * 0.07; // Adjust based on screen width
-    double linkTextSize = screenWidth * 0.045; // Adjust for link text
+    double mainTextSize = screenWidth * 0.05; // Adjust size for smaller mobile screens
+    double linkTextSize = screenWidth * 0.02; // Adjust link text size accordingly
 
-    // Adjust spacing dynamically with a max and min limit
-    double spacing = screenWidth * 0.03; // Smaller spacing for smaller screens
+    // Adjust horizontal padding and spacing dynamically based on screen size
+    double horizontalPadding = screenWidth * 0.001;
+
+    // Use wider spacing on bigger screens, tighter on mobile
+    double horizontalSpacing = screenWidth > 600 ? 50.0 : horizontalPadding;
 
     return Stack(
       children: [
@@ -40,22 +43,20 @@ class _HeaderSectionState extends State<HeaderSection> {
           right: 0,
           child: Container(
             height: 10,
-            color:AppColors.backgroundColor, // Border color
+            color: AppColors.backgroundColor, // Border color
           ),
         ),
         Container(
           margin: EdgeInsets.only(top: 10), // Offset content to accommodate the border
-          child: Wrap(
-            alignment: WrapAlignment.center,
-            spacing: spacing, // Spacing between elements
-            runSpacing: 10,  // Spacing between rows when wrapping occurs
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               GestureDetector(
                 onTap: () {
                   _handleLinkPress('studysync');
                 },
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 2, vertical: 8),
                   decoration: BoxDecoration(
                     color: _activeLink == 'studysync' ? Color(0xFFA62217) : Colors.transparent,
                     borderRadius: BorderRadius.circular(50),
@@ -63,25 +64,28 @@ class _HeaderSectionState extends State<HeaderSection> {
                   child: Text(
                     'STUDYSYNC',
                     style: TextStyle(
-                      fontSize: mainTextSize.clamp(20, 30), // Set a min and max size
+                      fontSize: mainTextSize.clamp(12, 24), // Clamped for smaller screens
                       fontWeight: FontWeight.bold,
                       color: _activeLink == 'studysync' ? Colors.white : Colors.black,
                     ),
                   ),
                 ),
               ),
+              SizedBox(width: horizontalSpacing), // Adjust spacing between elements
               HeaderLink(
                 text: 'Friends',
                 fontSize: linkTextSize,
                 isActive: _activeLink == 'friends',
                 onLinkPressed: _handleLinkPress,
               ),
+              SizedBox(width: horizontalSpacing), // Adjust spacing between elements
               HeaderLink(
                 text: 'Groups',
                 fontSize: linkTextSize,
                 isActive: _activeLink == 'groups',
                 onLinkPressed: _handleLinkPress,
               ),
+              SizedBox(width: horizontalSpacing), // Adjust spacing between elements
               HeaderLink(
                 text: 'Profile',
                 fontSize: linkTextSize,
@@ -124,7 +128,7 @@ class HeaderLink extends StatelessWidget {
         child: Text(
           text,
           style: TextStyle(
-            fontSize: fontSize.clamp(14, 22), // Clamp font size between 14 and 22
+            fontSize: fontSize.clamp(10, 18), // Clamp size for smaller screens
             fontWeight: FontWeight.bold,
             color: isActive ? Colors.white : Colors.black,
           ),

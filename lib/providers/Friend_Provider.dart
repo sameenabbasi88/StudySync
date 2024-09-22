@@ -105,6 +105,24 @@ class FriendProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void removeFriend(String friendName) async {
+    if (userEmail != null) {
+      final docRef = FirebaseFirestore.instance.collection('friends').doc(userEmail);
+      await docRef.set({
+        'fname': FieldValue.arrayRemove([friendName])
+      }, SetOptions(merge: true));
+
+      _addedFriends.remove(friendName);
+      notifyListeners();
+    }
+  }
+
+  double _getFontSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return screenWidth < 600 ? 14 : 16; // Smaller font size for mobile
+  }
+
+
   Widget buildAddedFriendsList(BuildContext context) {
     return Expanded(
       child: _addedFriends.isEmpty
@@ -112,7 +130,7 @@ class FriendProvider with ChangeNotifier {
         child: Text(
           'No friends added',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: _getFontSize(context),
             color: Colors.grey,
           ),
         ),
@@ -150,7 +168,14 @@ class FriendProvider with ChangeNotifier {
             ),
             title: Text(
               _addedFriends[index],
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: Colors.white,fontSize: _getFontSize(context),),
+
+            ),
+            trailing: IconButton(
+              icon: Icon(Icons.remove_circle, color: Colors.red),
+              onPressed: () {
+                removeFriend(_addedFriends[index]);
+              },
             ),
           );
         },

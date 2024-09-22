@@ -1,4 +1,3 @@
-import 'dart:html' as html; // Import for handling browser events
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -102,6 +101,23 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
     );
   }
 
+  TextStyle _responsiveTextStyle(double baseFontSize, BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Adjust font size for different screen widths
+    double fontSize = baseFontSize;
+    if (screenWidth < 600) {
+      fontSize = baseFontSize * 0.65;  // Decrease font size on mobile devices
+    }
+
+    return TextStyle(
+      fontSize: fontSize,
+      fontWeight: FontWeight.bold,
+      color: Colors.black87,
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -129,12 +145,9 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
                             children: [
                               Text(
                                 'WELCOME !',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
+                                style: _responsiveTextStyle(36, context),  // Base font size is 36
                               ),
+
                               SizedBox(height: 20),
                             ],
                           ),
@@ -216,16 +229,17 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
                       ],
                     ),
                     Container(
-                      margin: EdgeInsets.only(left: 340, top: 50),
-                      child: Text(
-                        'StudySync',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                      margin: EdgeInsets.only(top: 50),
+                      child: Align(
+                        alignment: Alignment.center,  // Ensures the text is centered horizontally
+                        child: Text(
+                          'StudySync',
+                          textAlign: TextAlign.center,  // Center the text within the container
+                          style: _responsiveTextStyle(36, context),  // Use responsive font size
                         ),
                       ),
                     ),
+
                   ],
                 ),
               ),

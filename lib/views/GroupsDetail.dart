@@ -404,30 +404,35 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
+        // Get screen width to determine font size, icon size, and padding
+        double screenWidth = MediaQuery.of(context).size.width;
+        double fontSize = screenWidth < 600 ? 12.0 : 18.0;  // Smaller font for mobile
+        double iconSize = screenWidth < 600 ? 18.0 : 30.0;  // Smaller icons for mobile
+        EdgeInsets containerPadding = screenWidth < 600 ? EdgeInsets.zero : EdgeInsets.all(16.0);  // Remove padding on mobile
+
         return Container(
-          padding: EdgeInsets.all(16.0),
+          padding: containerPadding,
           child: Wrap(
             children: [
               ListTile(
-                leading: Icon(
-                    Icons.share), // You can replace this with a specific icon
-                title: Text('Share on WhatsApp'),
+                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
+                title: Text('WhatsApp', style: TextStyle(fontSize: fontSize)),
                 onTap: () {
                   _shareLink('WhatsApp');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.share), // Replace with Instagram icon
-                title: Text('Share on Instagram'),
+                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
+                title: Text('Instagram', style: TextStyle(fontSize: fontSize)),
                 onTap: () {
                   _shareLink('Instagram');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.share), // Replace with Facebook icon
-                title: Text('Share on Facebook'),
+                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
+                title: Text('Facebook', style: TextStyle(fontSize: fontSize)),
                 onTap: () {
                   _shareLink('Facebook');
                   Navigator.pop(context);
@@ -440,6 +445,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     );
   }
 
+
+
   void _shareLink(String platform) {
     final String groupLink =
         "https://yourapp.com/group/${widget.groupId}"; // Example group link
@@ -450,6 +457,15 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get screen width
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Define font sizes based on screen width
+    double groupNameFontSize = screenWidth < 600 ? 14 : 24;
+    double creatorUsernameFontSize = screenWidth < 600 ? 12 : 18;
+    double manageTasksButtonFontSize = screenWidth < 600 ? 12 : 20;
+    double taskNameFontSize = screenWidth < 600 ? 14 : 18;
+
     return Scaffold(
       backgroundColor: Colors.grey[300],
       body: SafeArea(
@@ -470,101 +486,109 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Color(0xff003039), width: 2),
                   ),
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(8.0), // Reduced padding
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: EdgeInsets.all(8.0),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFc1121f), // Maroon color
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Wrap(
-                          spacing: 10,
-                          children: [
-                            Text(
-                              groupName,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'Created by: $creatorUsername',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white,
-                              ),
-                            ),
-                            ElevatedButton(
-                              onPressed: _toggleFollow,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    isFollowing ? Colors.grey : Colors.green,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.all(4.0), // Reduced padding
+                          decoration: BoxDecoration(
+                            color: Color(0xFFc1121f),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          width: double.infinity,
+                          child: Wrap(
+                            spacing: 10,
+                            children: [
+                              Text(
+                                groupName,
+                                style: TextStyle(
+                                  fontSize: groupNameFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
-                              child: Text(
-                                isFollowing ? 'Following' : 'Follow',
-                                style: TextStyle(color: Colors.white),
+                              Text(
+                                'Created by: $creatorUsername',
+                                style: TextStyle(
+                                  fontSize: creatorUsernameFontSize,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.more_horiz, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == 'Share') {
-                                  _showShareOptions();
-                                } else if (value == 'Copy Link') {
-                                  _copyGroupLink();
-                                } else if (value == 'Members') {
-                                  _fetchMembers(); // Define a method to show the list of members
-                                }
-                              },
-                              itemBuilder: (BuildContext context) {
-                                return {'Share', 'Copy Link', 'Members'}
-                                    .map((String choice) {
-                                  return PopupMenuItem<String>(
-                                    value: choice,
-                                    child: Text(choice),
-                                  );
-                                }).toList();
-                              },
-                            )
-                          ],
+                              ElevatedButton(
+                                onPressed: _toggleFollow,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isFollowing ? Colors.grey : Colors.green,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  isFollowing ? 'Following' : 'Follow',
+                                  style: TextStyle(color: Colors.white, fontSize: creatorUsernameFontSize),
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                icon: Icon(Icons.more_horiz, color: Colors.white),
+                                onSelected: (value) {
+                                  if (value == 'Share') {
+                                    _showShareOptions();
+                                  } else if (value == 'Copy Link') {
+                                    _copyGroupLink();
+                                  } else if (value == 'Members') {
+                                    _fetchMembers();
+                                  }
+                                },
+                                itemBuilder: (BuildContext context) {
+                                  return {'Share', 'Copy Link', 'Members'}
+                                      .map((String choice) {
+                                    return PopupMenuItem<String>(
+                                      value: choice,
+                                      child: Text(choice),
+                                    );
+                                  }).toList();
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-
-                      SizedBox(height: 10),
+                      SizedBox(height: 8), // Reduced height
                       Expanded(
-                        child: ListView.builder(
-                          itemCount: tasks.length,
-                          itemBuilder: (context, index) {
-                            return TaskItem(
-                              taskNumber: (index + 1).toString(),
-                              taskName: tasks[index].taskName,
-                              progress: tasks[index].progress,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            double screenWidth = constraints.maxWidth;
+                            return ListView.builder(
+                              itemCount: tasks.length,
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0), // Reduced padding
+                                  width: screenWidth < 600 ? screenWidth * 0.9 : screenWidth * 0.8,
+                                  child: TaskItem(
+                                    taskNumber: (index + 1).toString(),
+                                    taskName: tasks[index].taskName,
+                                    progress: tasks[index].progress,
+                                    fontSize: taskNameFontSize, // Dynamic font size
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),
                       ),
-                      SizedBox(height: 10),
-                      // Conditionally show the "Manage Tasks" button
+                      SizedBox(height: 8), // Reduced height
                       if (FirebaseAuth.instance.currentUser?.uid == creatorId)
                         Center(
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced padding
                             ),
                             onPressed: _showTaskPopup,
                             child: Text(
                               'Manage Tasks',
-                              style:
-                                  TextStyle(fontSize: 20, color: Colors.white),
+                              style: TextStyle(fontSize: manageTasksButtonFontSize, color: Colors.white),
                             ),
                           ),
                         ),
@@ -578,6 +602,8 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       ),
     );
   }
+
+
 }
 
 class TaskManager extends StatefulWidget {
@@ -623,7 +649,7 @@ class _TaskManagerState extends State<TaskManager> {
 
       // Add the new task to Firestore
       DocumentReference groupDoc =
-          FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+      FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       await groupDoc.update({
         'tasks': FieldValue.arrayUnion([
           {
@@ -643,7 +669,9 @@ class _TaskManagerState extends State<TaskManager> {
   int _calculateTaskPriority(DateTime dueDate) {
     DateTime today = DateTime.now();
     // Example logic: Priority decreases as the task date is further in the future
-    int daysUntilDue = dueDate.difference(today).inDays;
+    int daysUntilDue = dueDate
+        .difference(today)
+        .inDays;
     return daysUntilDue <= 7 ? 1 : 2; // High priority if within 7 days
   }
 
@@ -688,6 +716,17 @@ class _TaskManagerState extends State<TaskManager> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the screen width
+    double screenWidth = MediaQuery
+        .of(context)
+        .size
+        .width;
+
+    // Determine font size based on screen width
+    double fontSize = screenWidth < 600
+        ? 16
+        : 20; // Smaller font for mobile view
+
     return Container(
       width: 350,
       padding: EdgeInsets.all(16),
@@ -705,7 +744,7 @@ class _TaskManagerState extends State<TaskManager> {
                 'Manage Tasks',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: fontSize,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -723,11 +762,12 @@ class _TaskManagerState extends State<TaskManager> {
           ),
           SizedBox(height: 20),
           ...taskNames
-              .map((task) => TaskPopupItem(
-                    task: task,
-                    groupId: widget.groupId,
-                    onTaskDeleted: _handleTaskDeletion,
-                  ))
+              .map((task) =>
+              TaskPopupItem(
+                task: task,
+                groupId: widget.groupId,
+                onTaskDeleted: _handleTaskDeletion,
+              ))
               .toList(),
           SizedBox(height: 20),
           Align(
@@ -845,7 +885,7 @@ class TaskItem extends StatelessWidget {
   TaskItem({
     required this.taskNumber,
     required this.taskName,
-    required this.progress,
+    required this.progress, required fontSize,
   });
 
   @override
@@ -873,29 +913,29 @@ class TaskItem extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            width: 200,
-            child: SliderTheme(
-              data: SliderThemeData(
-                trackHeight: 18.0,
-                thumbShape: SliderComponentShape.noThumb,
-                overlayShape: SliderComponentShape.noOverlay,
-                activeTrackColor: Colors.green,
-                inactiveTrackColor: Colors.grey[300],
-                thumbColor: Colors.transparent,
-                overlayColor: Colors.transparent,
-              ),
-              child: Slider(
-                value: progress,
-                min: 0.0,
-                max: 1.0,
-                onChanged: (value) {
-                  // You might want to handle slider changes if needed
-                },
-                divisions: 10,
-              ),
-            ),
-          ),
+          // Container(
+          //   width: 200,
+          //   child: SliderTheme(
+          //     data: SliderThemeData(
+          //       trackHeight: 18.0,
+          //       thumbShape: SliderComponentShape.noThumb,
+          //       overlayShape: SliderComponentShape.noOverlay,
+          //       activeTrackColor: Colors.green,
+          //       inactiveTrackColor: Colors.grey[300],
+          //       thumbColor: Colors.transparent,
+          //       overlayColor: Colors.transparent,
+          //     ),
+          //     child: Slider(
+          //       value: progress,
+          //       min: 0.0,
+          //       max: 1.0,
+          //       onChanged: (value) {
+          //         // You might want to handle slider changes if needed
+          //       },
+          //       divisions: 10,
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );

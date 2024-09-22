@@ -60,7 +60,6 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
     super.dispose();
   }
 
-
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Update online status when dependencies change (e.g., navigating to a new page)
@@ -75,7 +74,8 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
 
   void onSectionChange(String section) {
     setState(() {
-      selectedSection = section; // Change the section without stopping the timer
+      selectedSection =
+          section; // Change the section without stopping the timer
     });
   }
 
@@ -86,7 +86,6 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
       _setUserOnlineStatus(true);
     }
   }
-
 
 
   @override
@@ -110,19 +109,27 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
                       child: Row(
                         children: [
                           if (selectedSection == 'studysync') ...[
-                            Expanded(flex: 2, child: ToDoSection()),
+                            Expanded(
+                              flex: 1, // Equal flex for ToDoSection
+                              child: ToDoSection(),
+                            ),
                             SizedBox(width: 20),
                             Expanded(
-                              flex: 3,
-                              child: StatsSection(sessionDurationNotifier: timerProvider.sessionDurationNotifier),
+                              flex: 1, // Equal flex for StatsSection
+                              child: StatsSection(
+                                  sessionDurationNotifier: timerProvider
+                                      .sessionDurationNotifier),
                             ),
-                          ] else if (selectedSection == 'friends') ...[
-                            Expanded(child: FriendsPage()),
-                          ] else if (selectedSection == 'groups') ...[
-                            Expanded(child: GroupsPage()),
-                          ] else if (selectedSection == 'profile') ...[
-                            Expanded(child: ProfilePage()),
-                          ],
+                          ] else
+                            if (selectedSection == 'friends') ...[
+                              Expanded(child: FriendsPage()),
+                            ] else
+                              if (selectedSection == 'groups') ...[
+                                Expanded(child: GroupsPage()),
+                              ] else
+                                if (selectedSection == 'profile') ...[
+                                  Expanded(child: ProfilePage()),
+                                ],
                         ],
                       ),
                     ),
@@ -141,7 +148,7 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
   }
 }
 
-class ToDoSection extends StatefulWidget {
+  class ToDoSection extends StatefulWidget {
   @override
   _ToDoSectionState createState() => _ToDoSectionState();
 }
@@ -322,6 +329,13 @@ class _ToDoItemState extends State<ToDoItem> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the screen width to adjust the UI based on the device.
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Adjust the font size based on the screen width (smaller for mobile).
+    double fontSize = screenWidth < 600 ? 14 : 16;
+    double dateFontSize = screenWidth < 600 ? 12 : 16;
+
     DateTime firstDate = DateTime(2000);
     DateTime lastDate = DateTime(2101);
 
@@ -361,7 +375,7 @@ class _ToDoItemState extends State<ToDoItem> {
             children: [
               CircleAvatar(
                 backgroundColor: Colors.white,
-                radius: 8,
+                radius: screenWidth < 600 ? 6 : 8, // Adjust radius based on screen width
               ),
               SizedBox(width: 10),
               Expanded(
@@ -379,7 +393,11 @@ class _ToDoItemState extends State<ToDoItem> {
                   },
                   child: Text(
                     widget.title,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize, // Adjust font size based on screen width
+                      overflow: TextOverflow.ellipsis, // Ensure text stays on one line
+                    ),
                   ),
                 ),
               ),
@@ -401,7 +419,7 @@ class _ToDoItemState extends State<ToDoItem> {
                   DateFormat('EEE, d MMM').format(effectiveDate),
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: dateFontSize, // Adjust date font size
                     decoration: TextDecoration.underline,
                   ),
                 )

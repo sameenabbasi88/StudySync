@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../utils/color.dart';
 
 class TimeSpentSection extends StatelessWidget {
@@ -11,19 +10,26 @@ class TimeSpentSection extends StatelessWidget {
   Widget build(BuildContext context) {
     String formattedTimeSpent = _formatDuration(totalTimeSpentThisWeek);
 
+    // Get the screen width
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    // Set font sizes based on screen width
+    double titleFontSize = screenWidth < 600 ? 18 : 20; // Smaller font for mobile
+    double timeFontSize = screenWidth < 600 ? 14 : 16; // Smaller font for mobile
+
     return Container(
-      padding: EdgeInsets.all(16),
+      // padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color:AppColors.backgroundColor,
+        color: AppColors.backgroundColor,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Time Spent :',
+            'Total Time Spent:',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: titleFontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -31,7 +37,7 @@ class TimeSpentSection extends StatelessWidget {
           Text(
             formattedTimeSpent,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: timeFontSize,
               color: Colors.black54,
             ),
           ),

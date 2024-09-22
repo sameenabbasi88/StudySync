@@ -29,13 +29,15 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _fetchProfileData() async {
-    final userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
+    final userDoc = await _firestore.collection('users').doc(
+        _auth.currentUser!.uid).get();
     if (userDoc.exists) {
       final data = userDoc.data()!;
       _usernameController.text = data['username'] ?? 'Unknown User';
       _favoriteSubjectController.text = data['favoriteSubject'] ?? 'Not set';
       setState(() {
-        _profilePhotoUrl = data['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
+        _profilePhotoUrl =
+            data['profilePhotoUrl'] ?? 'https://via.placeholder.com/150';
       });
     }
   }
@@ -54,12 +56,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: InputDecoration(labelText: 'Username'),
               ),
               TextField(
-                controller: TextEditingController()..text = DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                controller: TextEditingController()
+                  ..text = DateFormat('yyyy-MM-dd').format(DateTime.now()),
                 decoration: InputDecoration(labelText: 'Joined Date'),
                 enabled: false,
               ),
               TextField(
-                controller: TextEditingController()..text = 'Your Group Names Here',
+                controller: TextEditingController()
+                  ..text = 'Your Group Names Here',
                 decoration: InputDecoration(labelText: 'Groups'),
                 enabled: false,
               ),
@@ -76,7 +80,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 final favoriteSubject = _favoriteSubjectController.text;
 
                 try {
-                  await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
+                  await _firestore.collection('users').doc(
+                      _auth.currentUser!.uid).update({
                     'username': username,
                     'favoriteSubject': favoriteSubject,
                   });
@@ -109,7 +114,8 @@ class _ProfilePageState extends State<ProfilePage> {
         final imageData = result.files.single.bytes!;
 
         // Validate image data (optional)
-        if (imageData.length < 8 || imageData[0] != 0xFF || imageData[1] != 0xD8) {
+        if (imageData.length < 8 || imageData[0] != 0xFF ||
+            imageData[1] != 0xD8) {
           // Basic validation for JPEG files
           print('Selected file is not a valid image.');
           return;
@@ -136,7 +142,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _updateProfilePhotoUrl(String photoUrl) async {
     try {
-      final userDoc = _firestore.collection('users').doc(_auth.currentUser!.uid);
+      final userDoc = _firestore.collection('users').doc(
+          _auth.currentUser!.uid);
       await userDoc.update({'profilePhotoUrl': photoUrl});
     } catch (e) {
       print('Error updating profile photo URL: $e');
@@ -146,6 +153,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the screen width
+    final screenWidth = MediaQuery
+        .of(context)
+        .size
+        .width;
+
+    // Define base font sizes
+    double baseFontSize = screenWidth < 600
+        ? 12
+        : 18; // Smaller size for mobile
+    double iconSize = screenWidth < 600
+        ? 16
+        : 24; // Smaller icon size for mobile
+
     return Consumer<FriendProvider>(
       builder: (context, friendProvider, child) {
         final addedFriends = friendProvider.addedFriends;
@@ -193,74 +214,104 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           Expanded(
                             flex: 1,
-                            child: Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: StreamBuilder<DocumentSnapshot>(
-                                stream: _firestore.collection('users').doc(_auth.currentUser!.uid).snapshots(),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return Center(child: CircularProgressIndicator());
+                            child: StreamBuilder<DocumentSnapshot>(
+                              stream: _firestore.collection('users').doc(
+                                  _auth.currentUser!.uid).snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (!snapshot.hasData ||
+                                    !snapshot.data!.exists) {
+                                  return Center(
+                                      child: Text('No profile data available'));
+                                }
+
+                                final userDoc = snapshot.data!.data() as Map<
+                                    String,
+                                    dynamic>;
+                                Timestamp timestamp = userDoc.containsKey(
+                                    'date') ? userDoc['date'] : Timestamp.now();
+                                DateTime joinedDate = timestamp.toDate();
+                                String formattedDate = DateFormat('yyyy-MM-dd')
+                                    .format(joinedDate);
+
+                                String profilePhotoUrl = userDoc.containsKey(
+                                    'profilePhotoUrl')
+                                    ? userDoc['profilePhotoUrl']
+                                    : 'https://via.placeholder.com/150';
+
+                                List<dynamic> joinedGroups = userDoc
+                                    .containsKey('joinedgroup')
+                                    ? userDoc['joinedgroup']
+                                    : [];
+                                List<String> groupNames = joinedGroups.map((
+                                    group) {
+                                  if (group is Map<String, dynamic> &&
+                                      group.containsKey('groupName')) {
+                                    return group['groupName'] as String;
                                   }
-                                  if (!snapshot.hasData || !snapshot.data!.exists) {
-                                    return Center(child: Text('No profile data available'));
-                                  }
+                                  return 'Unknown Group';
+                                }).toList();
+                                String groupsList = groupNames.join(', ');
 
-                                  final userDoc = snapshot.data!.data() as Map<String, dynamic>;
-                                  Timestamp timestamp = userDoc.containsKey('date') ? userDoc['date'] : Timestamp.now();
-                                  DateTime joinedDate = timestamp.toDate();
-                                  String formattedDate = DateFormat('yyyy-MM-dd').format(joinedDate);
-
-                                  String profilePhotoUrl = userDoc.containsKey('profilePhotoUrl') ? userDoc['profilePhotoUrl'] : 'https://via.placeholder.com/150';
-
-                                  List<dynamic> joinedGroups = userDoc.containsKey('joinedgroup') ? userDoc['joinedgroup'] : [];
-                                  List<String> groupNames = joinedGroups.map((group) {
-                                    if (group is Map<String, dynamic> && group.containsKey('groupName')) {
-                                      return group['groupName'] as String;
-                                    }
-                                    return 'Unknown Group';
-                                  }).toList();
-                                  String groupsList = groupNames.join(', ');
-
-                                  return Container(
-                                    padding: EdgeInsets.all(16),
-                                    color: Colors.grey[300],
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              'Username: ${userDoc.containsKey('username') ? userDoc['username'] : 'Unknown User'}',
+                                return Container(
+                                  padding: EdgeInsets.all(4.0),
+                                  color: Colors.grey[300],
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment
+                                        .start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Username: ${userDoc.containsKey(
+                                                  'username')
+                                                  ? userDoc['username']
+                                                  : 'Unknown User'}',
                                               style: TextStyle(
-                                                fontSize: 18,
+                                                fontSize: baseFontSize + 2,
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.black87,
                                               ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            IconButton(
-                                              icon: Icon(Icons.edit, color: Colors.blue),
-                                              onPressed: _editProfile,
-                                            ),
-                                          ],
-                                        ),
-                                        Text(
-                                          'Joined: $formattedDate',
-                                          style: TextStyle(fontSize: 16, color: Colors.black87),
-                                        ),
-                                        Text(
-                                          'In Groups: $groupsList',
-                                          style: TextStyle(fontSize: 16, color: Colors.black87),
-                                        ),
-                                        Text(
-                                          'Favorite Subject: ${userDoc.containsKey('favoriteSubject') ? userDoc['favoriteSubject'] : 'Not set'}',
-                                          style: TextStyle(fontSize: 16, color: Colors.black87),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
+                                          ),
+                                          IconButton(
+                                            iconSize: iconSize,
+                                            icon: Icon(
+                                                Icons.edit, color: Colors.blue),
+                                            onPressed: _editProfile,
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        'Joined: $formattedDate',
+                                        style: TextStyle(fontSize: baseFontSize,
+                                            color: Colors.black87),
+                                      ),
+                                      Text(
+                                        'In Groups: $groupsList',
+                                        style: TextStyle(fontSize: baseFontSize,
+                                            color: Colors.black87),
+                                      ),
+                                      Text(
+                                        'Favorite Subject: ${userDoc
+                                            .containsKey('favoriteSubject')
+                                            ? userDoc['favoriteSubject']
+                                            : 'Not set'}',
+                                        style: TextStyle(fontSize: baseFontSize,
+                                            color: Colors.black87),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -283,7 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         Text(
                           'Added Friends (${addedFriends.length})',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: baseFontSize + 4,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
