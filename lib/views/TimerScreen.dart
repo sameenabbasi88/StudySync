@@ -12,21 +12,24 @@ import 'ProfilePage.dart'; // Import the file containing HeaderSection
 
 class TimerScreen extends StatefulWidget {
   final String taskTitle;
+  final String taskId;
   final DateTime taskDate;
 
-  TimerScreen({required this.taskTitle, required this.taskDate});
+  TimerScreen({required this.taskTitle, required this.taskDate, required this.taskId});
 
   @override
   _TimerScreenState createState() => _TimerScreenState();
 }
 
 class _TimerScreenState extends State<TimerScreen> {
-  late Timer _timer;
+  Timer? _timer;
   int _seconds = 0;
   bool _isRunning = false;
   bool _isPaused = false;
   bool _isCompleted = false;
   bool isPomodoro = false; // Add this line
+  String selectedOption = "";
+  bool _isStopwatchSelected = false;
   List<Map<String, dynamic>> uncompletedTasks = []; // Store uncompleted tasks
 
   @override
@@ -37,10 +40,16 @@ class _TimerScreenState extends State<TimerScreen> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
+  TextStyle _getTextStyle(String option) {
+    return TextStyle(
+      fontSize: 12,
+      color: _isCompleted ? Colors.grey : Colors.white,
+    );
+  }
   // Fetch uncompleted tasks from Firebase Firestore
   void _fetchUncompletedTasks() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
@@ -80,7 +89,6 @@ class _TimerScreenState extends State<TimerScreen> {
   String _getFormattedDate() {
     final now = DateTime.now();
     final day = now.day.toString().padLeft(2, '0');
-    final month = now.month.toString().padLeft(2, '0');
     final year = now.year;
     final monthName = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -91,39 +99,26 @@ class _TimerScreenState extends State<TimerScreen> {
   }
 
   // Pomodoro Timer Logic
-  void _startPomodoroTimer() {
+  void _setPomodoroTimer() {
     setState(() {
-      isPomodoro = true; // Set to true when starting Pomodoro
-      _isRunning = true;
+      isPomodoro = true;  // Set to true for Pomodoro mode
+      _isRunning = false; // Don't start the timer immediately
       _isPaused = false;
-      _seconds = 1500; // Set timer to 25 minutes (1500 seconds)
+      _seconds = 1500;    // Set timer to 25 minutes (1500 seconds)
       _isCompleted = false;
-    });
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (_seconds > 0) {
-        setState(() {
-          _seconds--;
-        });
-      } else {
-        _timer.cancel();
-        setState(() {
-          _isCompleted = true;
-          _isRunning = false;
-        });
-      }
     });
   }
 
+
   void _startButtonTimer() {
     setState(() {
-      isPomodoro = false; // Set to false when starting general timer
+      _isStopwatchSelected = true; // Set to true for stopwatch
       _isRunning = true;
       _isPaused = false;
       _seconds = 0; // Start timer from 0
       _isCompleted = false;
     });
 
-    // Start a periodic timer that increments every second
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         _seconds++; // Increment the timer by 1 second every tick
@@ -131,33 +126,67 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
-  void _pauseTimer() {
-    setState(() {
-      _isPaused = true;
-      _timer.cancel();
-    });
-  }
+  void _startPomodoroTimer() {
+    if (_isRunning || _seconds == 0) return; // Prevent starting if already running
 
-  void _resumeTimerS() {
     setState(() {
-      _isPaused = false;
       _isRunning = true;
+      _isPaused = false;
+      _seconds = 1500; // Set to 25 minutes for Pomodoro
+      _isCompleted = false;
     });
 
-    // Resume the timer from where it was paused
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (_seconds > 0) {
         setState(() {
-          _seconds++;
+          _seconds--; // Decrease the time every second
         });
       } else {
-        _timer.cancel();
+        _timer?.cancel();
         setState(() {
           _isCompleted = true;
           _isRunning = false;
         });
       }
     });
+  }
+
+  void _pauseTimer() {
+    setState(() {
+      _isPaused = true;
+      _isRunning = false; // Mark as not running
+      _timer?.cancel(); // Cancel the timer
+    });
+  }
+
+  void _resumeTimerS() {
+    setState(() {
+      _isPaused = false;
+      _isRunning = true; // Mark as running
+    });
+
+    // Resume based on whether it's a stopwatch or pomodoro
+    if (isPomodoro) {
+      _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+        if (_seconds > 0) {
+          setState(() {
+            _seconds--; // Decrement for Pomodoro
+          });
+        } else {
+          _timer?.cancel();
+          setState(() {
+            _isCompleted = true;
+            _isRunning = false;
+          });
+        }
+      });
+    } else {
+      _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+        setState(() {
+          _seconds++; // Increment for Stopwatch
+        });
+      });
+    }
   }
 
   void _resumeTimerP() {
@@ -173,7 +202,7 @@ class _TimerScreenState extends State<TimerScreen> {
           _seconds--;
         });
       } else {
-        _timer.cancel();
+        _timer?.cancel();
         setState(() {
           _isCompleted = true;
           _isRunning = false;
@@ -186,7 +215,7 @@ class _TimerScreenState extends State<TimerScreen> {
     setState(() {
       _isRunning = false;
       _isPaused = false;
-      _timer.cancel();
+      _timer?.cancel();
       _isCompleted = true; // Set task as completed
     });
 
@@ -197,27 +226,58 @@ class _TimerScreenState extends State<TimerScreen> {
     // Check if the user is logged in
     if (userId.isNotEmpty) {
       // Reference to the user's todoTasks document
-      DocumentReference docRef = FirebaseFirestore.instance
+      DocumentReference todoDocRef = FirebaseFirestore.instance
           .collection('todoTasks')
           .doc(userId);
 
+      // Reference to the user's completedTasks document
+      DocumentReference completedDocRef = FirebaseFirestore.instance
+          .collection('completedTasks')
+          .doc(userId);
+
       // Get the current task list from the database
-      DocumentSnapshot docSnapshot = await docRef.get();
+      DocumentSnapshot todoDocSnapshot = await todoDocRef.get();
 
-      if (docSnapshot.exists) {
-        List<dynamic> tasks = docSnapshot.get('Todotasks') ?? [];
+      if (todoDocSnapshot.exists) {
+        List<dynamic> tasks = todoDocSnapshot.get('Todotasks') ?? [];
 
-        // Remove the task from the list by matching the title
-        tasks.removeWhere((task) => task['title'] == widget.taskTitle);
+        // Find the completed task by matching the title
+        Map<String, dynamic>? completedTask;
+        tasks.removeWhere((task) {
+          if (task['title'] == widget.taskTitle) {
+            completedTask = Map<String, dynamic>.from(task); // Create a copy of the task
+            return true;
+          }
+          return false;
+        });
 
         // Update the Firestore document with the new list of tasks
-        await docRef.update({
+        await todoDocRef.update({
           'Todotasks': tasks,
         });
 
-        // Optionally, show a message when the task is removed
+        // Save the completed task to the completedTasks collection
+        if (completedTask != null) {
+          DocumentSnapshot completedDocSnapshot = await completedDocRef.get();
+          List<dynamic> completedTasks = completedDocSnapshot.exists
+              ? completedDocSnapshot.get('completedTasks') ?? []
+              : [];
+
+          // Add the completion date to the completed task
+          completedTask!['completionDate'] = DateTime.now(); // Using the null check operator
+
+          // Add the completed task to the completedTasks list
+          completedTasks.add(completedTask);
+
+          // Update the completedTasks document with the new task
+          await completedDocRef.set({
+            'completedTasks': completedTasks,
+          });
+        }
+
+        // Optionally, show a message when the task is moved
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Task "${widget.taskTitle}" completed and deleted.')),
+          SnackBar(content: Text('Task "${widget.taskTitle}" completed and moved to Completed Tasks.')),
         );
 
         // Refresh the uncompleted tasks list
@@ -241,7 +301,7 @@ class _TimerScreenState extends State<TimerScreen> {
             case 'profile':
               return ProfilePage();
             default:
-              return TimerScreen(taskTitle: '', taskDate: DateTime.now()); // Fallback screen
+              return TimerScreen(taskTitle: '', taskDate: DateTime.now(), taskId: '',); // Fallback screen
           }
         },
       ),
@@ -250,7 +310,7 @@ class _TimerScreenState extends State<TimerScreen> {
 
   void _resetToStartScreen() {
     setState(() {
-      _timer.cancel(); // Stop the timer
+      _timer?.cancel(); // Stop the timer
       _seconds = 0; // Reset the seconds count
       _isRunning = false; // Ensure the timer is not running
       _isPaused = false; // Reset any paused state
@@ -264,6 +324,63 @@ class _TimerScreenState extends State<TimerScreen> {
     } else {
       _resumeTimerS();
     }
+  }
+
+  void _startUserDefinedTimer(int minutes) {
+    setState(() {
+      _seconds = minutes * 60; // Convert minutes to seconds
+      _isRunning = true;
+      _isPaused = false;
+      _isCompleted = false;
+    });
+
+    // Start the countdown logic (e.g., using a Timer)
+    Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_seconds > 0) {
+        setState(() {
+          _seconds--;
+        });
+      } else {
+        timer.cancel();
+        _completeTask(); // Handle task completion
+      }
+    });
+  }
+
+  void _showTimerDialog(BuildContext context) {
+    final TextEditingController _controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Set Timer"),
+          content: TextField(
+            controller: _controller,
+            decoration: InputDecoration(hintText: "Enter time in minutes"),
+            keyboardType: TextInputType.number,
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text("CANCEL"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            TextButton(
+              child: Text("SET"),
+              onPressed: () {
+                int minutes = int.tryParse(_controller.text) ?? 25; // Default to 25 minutes if input is invalid
+                setState(() {
+                  _seconds = minutes * 60; // Convert minutes to seconds
+                });
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -286,7 +403,8 @@ class _TimerScreenState extends State<TimerScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Row(
+                child: MediaQuery.of(context).size.width >= 600
+                    ?Row(
                   children: [
                     // Timer Section
                     Expanded(
@@ -300,18 +418,37 @@ class _TimerScreenState extends State<TimerScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Display the timer
                               Text(
                                 _formatTime(_seconds),
-                                style: TextStyle(fontSize: 50, color: Colors.white),
+                                style: TextStyle(fontSize: 30, color: Colors.white),
                               ),
-                              SizedBox(height: 20),
+                              SizedBox(height: 5),
 
-                              // Start button, disabled if task is completed
-                              if (!_isRunning && !_isCompleted)
+                              // Start button for Pomodoro
+                              if (isPomodoro && !_isRunning && !_isCompleted)
                                 ElevatedButton(
-                                  onPressed: !_isCompleted ? _startButtonTimer : null, // Disable when completed
-                                  child: Text("START"),
+                                  onPressed: !_isCompleted ? _startPomodoroTimer : null,
+                                  child: Text("START", style: TextStyle(fontSize: 10)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              // Start button for User Defined Timer
+                              if (!isPomodoro && !_isStopwatchSelected && !_isRunning && !_isCompleted)
+                                ElevatedButton(
+                                  onPressed: !_isCompleted ? () => _showTimerDialog(context) : null,
+                                  child: Text("Start", style: TextStyle(fontSize: 10)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+
+                              // Stopwatch Start Button (Step 3: Conditional rendering)
+                              if (_isStopwatchSelected && !_isRunning && !_isCompleted)
+                                ElevatedButton(
+                                  onPressed: !_isCompleted ? _startButtonTimer : null,
+                                  child: Text("START STOPWATCH", style: TextStyle(fontSize: 10)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
@@ -321,7 +458,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               if (_isRunning && !_isPaused)
                                 ElevatedButton(
                                   onPressed: _pauseTimer,
-                                  child: Text("PAUSE"),
+                                  child: Text("PAUSE", style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
@@ -331,19 +468,19 @@ class _TimerScreenState extends State<TimerScreen> {
                               if (_isPaused)
                                 ElevatedButton(
                                   onPressed: _onResumeButtonPressed,
-                                  child: Text(isPomodoro ? 'Resume' : 'Resume'),
+                                  child: Text('Resume', style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
                                 ),
 
-                              SizedBox(height: 10),
+                              SizedBox(height: 5),
 
                               // Finish button
                               if (_isRunning)
                                 ElevatedButton(
                                   onPressed: _completeTask,
-                                  child: Text("FINISH"),
+                                  child: Text("FINISH", style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
@@ -360,33 +497,87 @@ class _TimerScreenState extends State<TimerScreen> {
 
                               // Wrap for Timer, Stopwatch, Pomodoro (disabled if _isCompleted is true)
                               Wrap(
-                                spacing: 8.0, // Adds space between each item
+                                spacing: 8.0,
                                 children: [
                                   GestureDetector(
-                                    onTap: !_isCompleted ? () { _resetToStartScreen(); } : null, // Disable if completed
-                                    child: Text(
-                                      "TIMER |",
-                                      style: TextStyle(
-                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
-                                      ),
+                                    onTap: !_isCompleted
+                                        ? () {
+                                      setState(() {
+                                        selectedOption = "TIMER"; // Update selected option
+                                        _showTimerDialog(context);
+                                        _isStopwatchSelected = false; // Reset stopwatch selection
+                                      });
+                                    }
+                                        : null,
+                                    child: Stack(
+                                      alignment: Alignment.bottomCenter,
+                                      children: [
+                                        // Underline for selected option
+                                        if (selectedOption == "TIMER")
+                                          Container(
+                                            height: 2,
+                                            width: 50, // Adjust width as needed
+                                            color: Colors.white,
+                                          ),
+                                        Text(
+                                          "TIMER |",
+                                          style: _getTextStyle("TIMER"),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: !_isCompleted ? () { _resetToStartScreen(); } : null, // Disable if completed
-                                    child: Text(
-                                      "STOPWATCH |",
-                                      style: TextStyle(
-                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
-                                      ),
+                                    onTap: !_isCompleted
+                                        ? () {
+                                      setState(() {
+                                        selectedOption = "STOPWATCH"; // Update selected option
+                                        _isStopwatchSelected = true; // Step 2: Update the stopwatch selection
+                                        _resetToStartScreen();
+                                      });
+                                    }
+                                        : null,
+                                    child: Stack(
+                                      alignment: Alignment.bottomCenter,
+                                      children: [
+                                        // Underline for selected option
+                                        if (selectedOption == "STOPWATCH")
+                                          Container(
+                                            height: 2,
+                                            width: 80, // Adjust width as needed
+                                            color: Colors.white,
+                                          ),
+                                        Text(
+                                          "STOPWATCH |",
+                                          style: _getTextStyle("STOPWATCH"),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: !_isCompleted ? _startPomodoroTimer : null, // Disable if completed
-                                    child: Text(
-                                      "POMODORO",
-                                      style: TextStyle(
-                                        color: _isCompleted ? Colors.grey : Colors.white, // Gray out if disabled
-                                      ),
+                                    onTap: !_isCompleted
+                                        ? () {
+                                      setState(() {
+                                        selectedOption = "POMODORO"; // Update selected option
+                                        _setPomodoroTimer();
+                                        _isStopwatchSelected = false; // Reset stopwatch selection
+                                      });
+                                    }
+                                        : null,
+                                    child: Stack(
+                                      alignment: Alignment.bottomCenter,
+                                      children: [
+                                        // Underline for selected option
+                                        if (selectedOption == "POMODORO")
+                                          Container(
+                                            height: 2,
+                                            width: 80, // Adjust width as needed
+                                            color: Colors.white,
+                                          ),
+                                        Text(
+                                          "POMODORO",
+                                          style: _getTextStyle("POMODORO"),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -396,7 +587,6 @@ class _TimerScreenState extends State<TimerScreen> {
                         ),
                       ),
                     ),
-
                     SizedBox(width: 16),
                     // Tasks Section
                     Expanded(
@@ -460,7 +650,254 @@ class _TimerScreenState extends State<TimerScreen> {
                       ),
                     ),
                   ],
-                ),
+                ):Column(children: [
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xff003039),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _formatTime(_seconds),
+                              style: TextStyle(fontSize: 30, color: Colors.white),
+                            ),
+                            SizedBox(height: 5),
+
+                            // Start button for Pomodoro
+                            if (isPomodoro && !_isRunning && !_isCompleted)
+                              ElevatedButton(
+                                onPressed: !_isCompleted ? _startPomodoroTimer : null,
+                                child: Text("START", style: TextStyle(fontSize: 10)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            // Start button for User Defined Timer
+                            if (!isPomodoro && !_isRunning && !_isCompleted)
+                              ElevatedButton(
+                                onPressed: !_isCompleted ? () => _showTimerDialog(context) : null,
+                                child: Text("SET TIMER", style: TextStyle(fontSize: 10)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            // Stopwatch Start Button (Step 3: Conditional rendering)
+                            if (_isStopwatchSelected && !_isRunning && !_isCompleted)
+                              ElevatedButton(
+                                onPressed: !_isCompleted ? _startButtonTimer : null,
+                                child: Text("START STOPWATCH", style: TextStyle(fontSize: 10)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            // Pause button
+                            if (_isRunning && !_isPaused)
+                              ElevatedButton(
+                                onPressed: _pauseTimer,
+                                child: Text("PAUSE", style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            // Resume button
+                            if (_isPaused)
+                              ElevatedButton(
+                                onPressed: _onResumeButtonPressed,
+                                child: Text('Resume', style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            SizedBox(height: 5),
+
+                            // Finish button
+                            if (_isRunning)
+                              ElevatedButton(
+                                onPressed: _completeTask,
+                                child: Text("FINISH", style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+
+                            SizedBox(height: 10),
+
+                            Text(
+                              "Timer is default",
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+
+                            SizedBox(height: 10),
+
+                            // Wrap for Timer, Stopwatch, Pomodoro (disabled if _isCompleted is true)
+                            Wrap(
+                              spacing: 8.0,
+                              children: [
+                                GestureDetector(
+                                  onTap: !_isCompleted
+                                      ? () {
+                                    setState(() {
+                                      selectedOption = "TIMER"; // Update selected option
+                                      _showTimerDialog(context);
+                                      _isStopwatchSelected = false; // Reset stopwatch selection
+                                    });
+                                  }
+                                      : null,
+                                  child: Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    children: [
+                                      // Underline for selected option
+                                      if (selectedOption == "TIMER")
+                                        Container(
+                                          height: 2,
+                                          width: 50, // Adjust width as needed
+                                          color: Colors.white,
+                                        ),
+                                      Text(
+                                        "TIMER |",
+                                        style: _getTextStyle("TIMER"),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: !_isCompleted
+                                      ? () {
+                                    setState(() {
+                                      selectedOption = "STOPWATCH"; // Update selected option
+                                      _isStopwatchSelected = true; // Step 2: Update the stopwatch selection
+                                      _resetToStartScreen();
+                                    });
+                                  }
+                                      : null,
+                                  child: Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    children: [
+                                      // Underline for selected option
+                                      if (selectedOption == "STOPWATCH")
+                                        Container(
+                                          height: 2,
+                                          width: 80, // Adjust width as needed
+                                          color: Colors.white,
+                                        ),
+                                      Text(
+                                        "STOPWATCH |",
+                                        style: _getTextStyle("STOPWATCH"),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: !_isCompleted
+                                      ? () {
+                                    setState(() {
+                                      selectedOption = "POMODORO"; // Update selected option
+                                      _setPomodoroTimer();
+                                      _isStopwatchSelected = false; // Reset stopwatch selection
+                                    });
+                                  }
+                                      : null,
+                                  child: Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    children: [
+                                      // Underline for selected option
+                                      if (selectedOption == "POMODORO")
+                                        Container(
+                                          height: 2,
+                                          width: 80, // Adjust width as needed
+                                          color: Colors.white,
+                                        ),
+                                      Text(
+                                        "POMODORO",
+                                        style: _getTextStyle("POMODORO"),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 10),
+                  // Tasks Section
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xff003039),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: SingleChildScrollView(child:  Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "TASK FOR THIS SESSION",
+                            style: TextStyle(fontSize: 14, color: Colors.white),
+                          ),
+                          SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Icon(
+                                _isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                widget.taskTitle,
+                                style: TextStyle(fontSize: 12, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            "UNCOMPLETED TASKS",
+                            style: TextStyle(fontSize: 14, color: Colors.white),
+                          ),
+                          SizedBox(height: 10),
+                          ...uncompletedTasks.map((task) {
+                            return ListTile(
+                              title: Row(
+                                children: [
+                                  Icon(
+                                    Icons.circle_outlined,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+
+                                    task['title'],
+                                    style: TextStyle(
+
+                                        fontSize: 12,color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                task['date'] != null ? DateFormat('MM-dd-yyyy').format(task['date']) : 'No date set',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                      ),
+                    ),
+                  )],),
               ),
             ),
           ],

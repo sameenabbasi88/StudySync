@@ -23,13 +23,10 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
 
     if (userId.isNotEmpty) {
       try {
-        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
-            .collection('users').doc(userId).get();
+        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance.collection('users').doc(userId).get();
 
         if (userSnapshot.exists && userSnapshot.data() != null) {
-          Map<String, dynamic> userData = userSnapshot.data() as Map<
-              String,
-              dynamic>;
+          Map<String, dynamic> userData = userSnapshot.data() as Map<String, dynamic>;
 
           DateTime lastStreakUpdate = userData['lastStreakUpdate'] != null
               ? (userData['lastStreakUpdate'] as Timestamp).toDate()
@@ -38,26 +35,40 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
           DateTime currentTime = DateTime.now();
           Duration difference = currentTime.difference(lastStreakUpdate);
 
-          if (difference.inHours >= 24) {
-            int newStreakNumber = (userData['streakNumber'] ?? 0) + 1;
-
-            await FirebaseFirestore.instance.collection('users')
-                .doc(userId)
-                .update({
-              'streakNumber': newStreakNumber,
+          if (difference.inDays > 0) {
+            // Reset streak number to 1 if more than 1 day has passed
+            await FirebaseFirestore.instance.collection('users').doc(userId).update({
+              'streakNumber': 1, // Resetting the streak to 1
               'lastStreakUpdate': Timestamp.fromDate(currentTime),
             });
 
             if (mounted) {
               setState(() {
-                streakNumber = newStreakNumber;
+                streakNumber = 1; // Resetting streak in UI
               });
             }
           } else {
-            if (mounted) {
-              setState(() {
-                streakNumber = userData['streakNumber'] ?? 0;
+            // If the user logged in within the same day, increment the streak
+            int currentStreak = userData['streakNumber'] ?? 0;
+
+            if (difference.inHours >= 24) {
+              currentStreak += 1; // Increment the streak
+              await FirebaseFirestore.instance.collection('users').doc(userId).update({
+                'streakNumber': currentStreak,
+                'lastStreakUpdate': Timestamp.fromDate(currentTime),
               });
+
+              if (mounted) {
+                setState(() {
+                  streakNumber = currentStreak;
+                });
+              }
+            } else {
+              if (mounted) {
+                setState(() {
+                  streakNumber = currentStreak; // Keep current streak number
+                });
+              }
             }
           }
         }
@@ -69,34 +80,20 @@ class _DailyStreakSectionState extends State<DailyStreakSection> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the screen width to adjust the font size based on the device.
-    double screenWidth = MediaQuery
-        .of(context)
-        .size
-        .width;
-
-    // Adjust the font size based on the screen width (smaller for mobile).
-    double titleFontSize = screenWidth < 600
-        ? 18
-        : 18; // Smaller font for mobile
-    double descriptionFontSize = screenWidth < 600
-        ? 10
-        : 10; // Smaller font for mobile
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'DAILY STREAK: $streakNumber 🔥',
           style: TextStyle(
-            fontSize: titleFontSize,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
         ),
         SizedBox(height: 5),
         Text(
           '* Streak counter: Increases with consecutive daily logins. Resets if a day is missed.',
-          style: TextStyle(fontSize: descriptionFontSize),
+          style: TextStyle(fontSize: 12),
         ),
       ],
     );

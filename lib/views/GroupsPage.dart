@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import '../providers/Friend_Provider.dart';
 import 'GroupsDetail.dart';
@@ -18,144 +19,269 @@ class _GroupsPageState extends State<GroupsPage> {
   String searchQuery = ''; // Variable to hold search query
 
 
+
   @override
   Widget build(BuildContext context) {
     final friendProvider = Provider.of<FriendProvider>(context);
-    final isMobile = MediaQuery.of(context).size.width < 600; // Example breakpoint for mobile
-
-    double groupTitleFontSize = isMobile ? 12 : 16; // Smaller font size for mobile
-    double friendTitleFontSize = isMobile ? 16 : 18; // Smaller font size for mobile
-    double groupCardFontSize = isMobile ? 12 : 18; // Smaller font size for mobile
-    double newGroupButtonFontSize = isMobile ? 12 : 16; // Smaller font size for mobile
-    double textFieldFontSize = isMobile ? 12 : 16;
 
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Color(0xff003039),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Groups and Friends',
-                      style: TextStyle(
-                        fontSize: groupTitleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 600) { // Mobile view
+              return Column(
+                children: [
+                  Expanded(
+                    flex: 2, // Increase flex value to give more space
+                    child: Container(
+                      padding: EdgeInsets.all(5), // Adjusted padding
+                      decoration: BoxDecoration(
+                        color: Color(0xff003039),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Groups and Friends',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 12), // Adjusted spacing
+
+                          // Only show the search bar if no group is selected
+                          if (selectedGroup == null)
+                            Container(
+                              height: 30,
+                              child:    TextField(
+
+                                controller: searchController,
+                                onChanged: (value) {
+                                  setState(() {
+                                    searchQuery = value.toLowerCase();
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(Icons.search,size: 20,),
+                                  hintText: 'Search groups',
+                                  hintStyle: TextStyle(fontSize: 12),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),),
+
+                          SizedBox(height: 12), // Adjusted spacing
+
+                          Expanded(
+                            child: selectedGroup == null
+                                ? StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('groups').snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return Center(child: CircularProgressIndicator());
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(child: Text('Error: ${snapshot.error}'));
+                                }
+
+                                final groups = snapshot.data?.docs.where((doc) {
+                                  final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
+                                  return groupName.contains(searchQuery);
+                                }).toList() ?? [];
+
+                                return GridView.builder(
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                  ),
+                                  itemCount: groups.length + 1, // Add one for the 'New Group' button
+                                  itemBuilder: (context, index) {
+                                    if (index < groups.length) {
+                                      final group = groups[index].data() as Map<String, dynamic>;
+                                      return _buildGroupCard(
+                                        group['groupname'],
+                                        Color(group['color']),
+                                        group['groupid'], // Pass the groupid here
+                                      );
+                                    } else {
+                                      return _buildAddGroupButton();
+                                    }
+                                  },
+                                );
+                              },
+                            )
+                                : TaskManagerApp(groupId: selectedGroup!), // Display TaskManagerApp if a group is selected
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 16),
-                    if (selectedGroup == null)
-                      TextField(
-                        controller: searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value.toLowerCase();
-                          });
-                        },
-                        style: TextStyle(fontSize: textFieldFontSize),
-                        decoration: InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Search groups',
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                  ),
+                  SizedBox(height: 8), // Adjusted spacing for mobile
+                  Container(
+                    height: 100, // Set a fixed height for the friends container
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xff003039),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Added Friends (${friendProvider.addedFriends.length})',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
+                        SizedBox(height: 8),
+                        friendProvider.buildAddedFriendsList(context),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+
+            } else { // Web view
+              return Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xff003039),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    SizedBox(height: 16),
-                    Expanded(
-                      child: selectedGroup == null
-                          ? StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('groups').snapshots(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return Center(child: CircularProgressIndicator());
-                          }
-                          if (snapshot.hasError) {
-                            return Center(child: Text('Error: ${snapshot.error}'));
-                          }
-
-                          final groups = snapshot.data?.docs.where((doc) {
-                            final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
-                            return groupName.contains(searchQuery);
-                          }).toList() ?? [];
-
-                          return GridView.builder(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Groups and Friends',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
                             ),
-                            itemCount: groups.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index < groups.length) {
-                                final group = groups[index].data() as Map<String, dynamic>;
-                                return _buildGroupCard(
-                                  group['groupname'],
-                                  Color(group['color']),
-                                  group['groupid'],
-                                  groupCardFontSize,
+                          ),
+                          SizedBox(height: 16),
+
+                          // Only show the search bar if no group is selected
+                          if (selectedGroup == null)
+                            TextField(
+                              controller: searchController,
+                              onChanged: (value) {
+                                setState(() {
+                                  searchQuery = value.toLowerCase();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                hintText: 'Search groups',
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+
+                          SizedBox(height: 16),
+
+                          Expanded(
+                            child: selectedGroup == null
+                                ? StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('groups').snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return Center(child: CircularProgressIndicator());
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(child: Text('Error: ${snapshot.error}'));
+                                }
+
+                                final groups = snapshot.data?.docs.where((doc) {
+                                  final groupName = (doc.data() as Map<String, dynamic>)['groupname'].toString().toLowerCase();
+                                  return groupName.contains(searchQuery);
+                                }).toList() ?? [];
+
+                                return GridView.builder(
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                  ),
+                                  itemCount: groups.length + 1, // Add one for the 'New Group' button
+                                  itemBuilder: (context, index) {
+                                    if (index < groups.length) {
+                                      final group = groups[index].data() as Map<String, dynamic>;
+                                      return _buildGroupCard(
+                                        group['groupname'],
+                                        Color(group['color']),
+                                        group['groupid'], // Pass the groupid here
+                                      );
+                                    } else {
+                                      return _buildAddGroupButton();
+                                    }
+                                  },
                                 );
-                              } else {
-                                return _buildAddGroupButton(newGroupButtonFontSize);
-                              }
-                            },
-                          );
-                        },
-                      )
-                          : TaskManagerApp(groupId: selectedGroup!),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Color(0xff003039),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Added Friends (${friendProvider.addedFriends.length})',
-                      style: TextStyle(
-                        fontSize: friendTitleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                              },
+                            )
+                                : TaskManagerApp(groupId: selectedGroup!), // Display TaskManagerApp if a group is selected
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 8),
-                    friendProvider.buildAddedFriendsList(context),
-                  ],
-                ),
-              ),
-            ),
-          ],
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xff003039),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Added Friends (${friendProvider.addedFriends.length})',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          friendProvider.buildAddedFriendsList(context),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
         ),
       ),
+
     );
   }
 
-  Widget _buildGroupCard(String groupName, Color color, String groupId, double fontSize) {
+  Widget _buildGroupCard(String groupName, Color color, String groupId) {
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedGroup = groupId;
+          selectedGroup = groupId; // Set the selectedGroup to the groupId
         });
       },
       child: Container(
@@ -168,7 +294,7 @@ class _GroupsPageState extends State<GroupsPage> {
             groupName,
             style: TextStyle(
               color: color == Colors.white ? Colors.black : Colors.white,
-              fontSize: fontSize,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -177,7 +303,7 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
-  Widget _buildAddGroupButton(double fontSize) {
+  Widget _buildAddGroupButton() {
     return GestureDetector(
       onTap: () {
         _showNewGroupPopup(context);
@@ -192,17 +318,12 @@ class _GroupsPageState extends State<GroupsPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.add, color: Colors.white, size: 30),
-              SizedBox(height: 4),
-              Flexible(
-                child: Text(
-                  'New Group',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                'New Group',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -211,8 +332,6 @@ class _GroupsPageState extends State<GroupsPage> {
       ),
     );
   }
-
-
 
   void _showNewGroupPopup(BuildContext context) {
     showDialog(
@@ -277,7 +396,7 @@ class _GroupsPageState extends State<GroupsPage> {
                         backgroundColor: Colors.yellow, // Custom color button
                       ),
                       onPressed: () {
-                        // Handle custom color selection if needed
+                        _openColorPicker(context);
                       },
                       child: Text('Custom', style: TextStyle(color: Colors.black)),
                     ),
@@ -298,6 +417,37 @@ class _GroupsPageState extends State<GroupsPage> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _openColorPicker(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Pick a color!'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: selectedColor,
+              onColorChanged: (Color color) {
+                setState(() {
+                  selectedColor = color;
+                });
+              },
+              showLabel: true,
+              pickerAreaHeightPercent: 0.8,
+            ),
+          ),
+          actions: <Widget>[
+            ElevatedButton(
+              child: const Text('Select'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
         );
       },
     );

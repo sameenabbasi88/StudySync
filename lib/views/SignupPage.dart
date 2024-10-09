@@ -19,7 +19,21 @@ class _StudySyncSignupAppState extends State<StudySyncSignupApp> {
   Future<void> _signUp() async {
     if (_formKey.currentState?.validate() ?? false) {
       try {
-        // Create a new user with Firebase Authentication
+        // Check if the username is already taken
+        QuerySnapshot usernameSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('username', isEqualTo: _usernameController.text)
+            .get();
+
+        if (usernameSnapshot.docs.isNotEmpty) {
+          // If the username exists, show an error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Username is already taken, please choose another')),
+          );
+          return;
+        }
+
+        // Proceed to create a new user with Firebase Authentication
         UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
@@ -52,6 +66,7 @@ class _StudySyncSignupAppState extends State<StudySyncSignupApp> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

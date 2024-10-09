@@ -39,10 +39,10 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
   @override
   void initState() {
     super.initState();
-    _startListeningToTasks();
+    _startListeningToTasks(); // Listen for changes in tasks
     if (widget.groupId.isNotEmpty) {
-      _fetchGroupDetails(); // Fetch group details when the screen is initialized
-      _fetchTasks(); // Fetch tasks
+      _fetchGroupDetails(); // Fetch group details
+      _fetchTasks(); // Fetch initial tasks
     } else {
       print('Group ID is empty');
     }
@@ -61,11 +61,10 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
             onTaskAdded: (newTask) {
               setState(() {
                 tasks.add(newTask); // Update the local task list
-                _updateTodoTasks(
-                    [newTask]); // Ensure new tasks are pushed to followers
+                _updateTodoTasks([newTask]); // Push new tasks to followers
               });
             },
-            groupId: widget.groupId, // Pass the group ID
+            groupId: widget.groupId,
           ),
         );
       },
@@ -81,13 +80,11 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
       if (groupSnapshot.exists) {
         setState(() {
-          groupName = groupSnapshot['groupname'] ??
-              'Unknown Group'; // Fetch the group name
-          creatorId =
-              groupSnapshot['owner'] ?? ''; // Fetch the creator's user ID
-          _fetchCreatorUsername(creatorId); // Fetch the creator's username
-          _checkIfFollowing(); // Check if the user is following the group
-          _checkIfCreator(); // Check if the current user is the creator
+          groupName = groupSnapshot['groupname'] ?? 'Unknown Group';
+          creatorId = groupSnapshot['owner'] ?? '';
+          _fetchCreatorUsername(creatorId);
+          _checkIfFollowing();
+          _checkIfCreator();
         });
       } else {
         print('Group document does not exist');
@@ -106,14 +103,96 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
       if (userSnapshot.exists) {
         setState(() {
-          creatorUsername = userSnapshot['username'] ??
-              'Unknown Creator'; // Fetch the username
+          creatorUsername = userSnapshot['username'] ?? 'Unknown Creator';
         });
       } else {
         print('User document does not exist');
       }
     } catch (e) {
       print('Error fetching creator username: $e');
+    }
+  }
+
+  Future<void> _fetchTasks() async {
+    try {
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      if (groupSnapshot.exists) {
+        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
+        setState(() {
+          tasks = tasksFromFirestore.map((taskData) {
+            return Task(
+              taskName: taskData['task'],
+              progress: taskData['progress'],
+            );
+          }).toList();
+        });
+      } else {
+        print('Group document does not exist');
+      }
+    } catch (e) {
+      print('Error fetching tasks: $e');
+    }
+  }
+
+  void _startListeningToTasks() {
+    FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .snapshots()
+        .listen((groupSnapshot) {
+      if (groupSnapshot.exists) {
+        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
+        setState(() {
+          tasks = tasksFromFirestore.map((taskData) {
+            return Task(
+              taskName: taskData['task'],
+              progress: taskData['progress'],
+            );
+          }).toList();
+        });
+      }
+    });
+  }
+
+  Future<void> _updateTodoTasks(List<dynamic> newTasks) async {
+    try {
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      if (groupSnapshot.exists) {
+        List<dynamic> followers = groupSnapshot['followers'] ?? [];
+
+        for (var follower in followers) {
+          String followerId = follower['userId'].toString();
+
+          await FirebaseFirestore.instance
+              .collection('todoTasks')
+              .doc(followerId)
+              .set({
+            'Todotasks': FieldValue.arrayUnion(newTasks.map((taskData) {
+              DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
+              int taskPriority = _calculateTaskPriority(date); // Calculate the priority
+              String formattedDate = DateFormat('MM-dd-yyyy').format(date);
+
+              return {
+                'title': taskData['task'],
+                'userId': followerId,
+                'date': formattedDate,
+                'priority': taskPriority,
+                'groupName': groupName,
+              };
+            }).toList()),
+          }, SetOptions(merge: true));
+        }
+      }
+    } catch (e) {
+      print('Error updating todoTasks for followers: $e');
     }
   }
 
@@ -180,31 +259,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     );
   }
 
-  Future<void> _fetchTasks() async {
-    try {
-      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .get();
-
-      if (groupSnapshot.exists) {
-        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
-        setState(() {
-          tasks = tasksFromFirestore.map((taskData) {
-            return Task(
-              taskName: taskData['task'],
-              progress: taskData['progress'],
-            );
-          }).toList();
-        });
-      } else {
-        print('Group document does not exist');
-      }
-    } catch (e) {
-      print('Error fetching tasks: $e');
-    }
-  }
-
   Future<void> _checkIfCreator() async {
     try {
       User? currentUser = FirebaseAuth
@@ -250,7 +304,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
           setState(() {
             // Ensure groupId is compared as a string
             isFollowing = followingGroups.any((group) =>
-                group['groupId'].toString() == widget.groupId.toString());
+            group['groupId'].toString() == widget.groupId.toString());
           });
         }
       }
@@ -273,71 +327,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
-  void _startListeningToTasks() {
-    FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .snapshots()
-        .listen((groupSnapshot) {
-      if (groupSnapshot.exists) {
-        List<dynamic> tasksFromFirestore = groupSnapshot['tasks'] ?? [];
-        setState(() {
-          tasks = tasksFromFirestore.map((taskData) {
-            return Task(
-              taskName: taskData['task'],
-              progress: taskData['progress'],
-            );
-          }).toList();
-        });
-
-        // Update the todoTasks collection when tasks change
-        _updateTodoTasks(tasksFromFirestore);
-      }
-    });
-  }
-
-  Future<void> _updateTodoTasks(List<dynamic> newTasks) async {
-    try {
-      // Fetch the group document to get the list of followers
-      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .get();
-
-      if (groupSnapshot.exists) {
-        List<dynamic> followers = groupSnapshot['followers'] ?? [];
-
-        for (var follower in followers) {
-          String followerId =
-              follower['userId'].toString(); // Ensure userId is String
-
-          // Update todoTasks for each follower
-          await FirebaseFirestore.instance
-              .collection('todoTasks')
-              .doc(followerId)
-              .set({
-            'Todotasks': FieldValue.arrayUnion(newTasks.map((taskData) {
-              DateTime date =
-                  DateTime.now().add(Duration(days: 7)); // Example date
-              int taskPriority =
-                  _calculateTaskPriority(date); // Calculate the priority
-              String formattedDate = DateFormat('MM-dd-yyyy').format(date);
-
-              return {
-                'title': taskData['task'],
-                'userId': followerId, // Ensure userId is String
-                'date': formattedDate,
-                'priority': taskPriority,
-              };
-            }).toList()),
-          }, SetOptions(merge: true)); // Merge with existing tasks
-        }
-      }
-    } catch (e) {
-      print('Error updating todoTasks for followers: $e');
-    }
-  }
-
   Future<void> _toggleFollow() async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
@@ -346,9 +335,9 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         String userId = currentUser.uid;
 
         DocumentReference userDoc =
-            FirebaseFirestore.instance.collection('users').doc(userId);
+        FirebaseFirestore.instance.collection('users').doc(userId);
         DocumentReference groupDoc =
-            FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+        FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 
         if (isFollowing) {
           // Unfollow logic
@@ -391,9 +380,10 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     }
   }
 
+
   void _copyGroupLink() {
     final String groupLink =
-        "https://yourapp.com/group/${widget.groupId}"; // Example group link
+        "https://studysync-bf9da.web.app"; // Example group link
     Clipboard.setData(ClipboardData(text: groupLink));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Group link copied to clipboard!')),
@@ -404,35 +394,30 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
-        // Get screen width to determine font size, icon size, and padding
-        double screenWidth = MediaQuery.of(context).size.width;
-        double fontSize = screenWidth < 600 ? 12.0 : 18.0;  // Smaller font for mobile
-        double iconSize = screenWidth < 600 ? 18.0 : 30.0;  // Smaller icons for mobile
-        EdgeInsets containerPadding = screenWidth < 600 ? EdgeInsets.zero : EdgeInsets.all(16.0);  // Remove padding on mobile
-
         return Container(
-          padding: containerPadding,
+          padding: EdgeInsets.all(16.0),
           child: Wrap(
             children: [
               ListTile(
-                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
-                title: Text('WhatsApp', style: TextStyle(fontSize: fontSize)),
+                leading: Icon(
+                    Icons.share), // You can replace this with a specific icon
+                title: Text('Share on WhatsApp'),
                 onTap: () {
                   _shareLink('WhatsApp');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
-                title: Text('Instagram', style: TextStyle(fontSize: fontSize)),
+                leading: Icon(Icons.share), // Replace with Instagram icon
+                title: Text('Share on Instagram'),
                 onTap: () {
                   _shareLink('Instagram');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.share, size: iconSize), // Adjust icon size
-                title: Text('Facebook', style: TextStyle(fontSize: fontSize)),
+                leading: Icon(Icons.share), // Replace with Facebook icon
+                title: Text('Share on Facebook'),
                 onTap: () {
                   _shareLink('Facebook');
                   Navigator.pop(context);
@@ -445,8 +430,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     );
   }
 
-
-
   void _shareLink(String platform) {
     final String groupLink =
         "https://yourapp.com/group/${widget.groupId}"; // Example group link
@@ -457,17 +440,25 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen width
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    // Define font sizes based on screen width
-    double groupNameFontSize = screenWidth < 600 ? 14 : 24;
-    double creatorUsernameFontSize = screenWidth < 600 ? 12 : 18;
-    double manageTasksButtonFontSize = screenWidth < 600 ? 12 : 20;
-    double taskNameFontSize = screenWidth < 600 ? 14 : 18;
-
     return Scaffold(
       backgroundColor: Colors.grey[300],
+      appBar: AppBar(
+        backgroundColor: Color(0xFFc1121f), // Maroon color
+        title: Text(
+          groupName,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context); // Navigates back to the previous page
+          },
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: Stack(
@@ -486,109 +477,112 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Color(0xff003039), width: 2),
                   ),
-                  padding: EdgeInsets.all(8.0), // Reduced padding
+                  padding: EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Container(
-                          padding: EdgeInsets.all(4.0), // Reduced padding
-                          decoration: BoxDecoration(
-                            color: Color(0xFFc1121f),
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          width: double.infinity,
-                          child: Wrap(
-                            spacing: 10,
-                            children: [
-                              Text(
-                                groupName,
+                      Container(
+                        padding: EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFc1121f), // Maroon color
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        child: Wrap(
+                          spacing: 5,
+                          children: [
+
+                            MediaQuery.of(context).size.width >= 600
+                                ? Text(
+                              groupName,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            )
+                                : SizedBox.shrink(), // Returns an empty widget for mobile
+
+                            Text(
+                              'Created by: $creatorUsername',
+                              style: TextStyle(
+                                fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14, // 12 for mobile, 18 for web
+                                color: Colors.white,
+                              ),
+                            ),
+
+                            ElevatedButton(
+                              onPressed: _toggleFollow,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                isFollowing ? Colors.grey : Colors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                isFollowing ? 'Following' : 'Follow',
                                 style: TextStyle(
-                                  fontSize: groupNameFontSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                    fontSize: MediaQuery.of(context).size.width < 600 ? 10 : 14,
+                                    color: Colors.white),
                               ),
-                              Text(
-                                'Created by: $creatorUsername',
-                                style: TextStyle(
-                                  fontSize: creatorUsernameFontSize,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: _toggleFollow,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isFollowing ? Colors.grey : Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  isFollowing ? 'Following' : 'Follow',
-                                  style: TextStyle(color: Colors.white, fontSize: creatorUsernameFontSize),
-                                ),
-                              ),
-                              PopupMenuButton<String>(
-                                icon: Icon(Icons.more_horiz, color: Colors.white),
-                                onSelected: (value) {
-                                  if (value == 'Share') {
-                                    _showShareOptions();
-                                  } else if (value == 'Copy Link') {
-                                    _copyGroupLink();
-                                  } else if (value == 'Members') {
-                                    _fetchMembers();
-                                  }
-                                },
-                                itemBuilder: (BuildContext context) {
-                                  return {'Share', 'Copy Link', 'Members'}
-                                      .map((String choice) {
-                                    return PopupMenuItem<String>(
-                                      value: choice,
-                                      child: Text(choice),
-                                    );
-                                  }).toList();
-                                },
-                              ),
-                            ],
-                          ),
+                            ),
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert,size: 10, color: Colors.white),
+                              onSelected: (value) {
+                                if (value == 'Share') {
+                                  _showShareOptions();
+                                } else if (value == 'Copy Link') {
+                                  _copyGroupLink();
+                                } else if (value == 'Members') {
+                                  _fetchMembers(); // Define a method to show the list of members
+                                }
+                              },
+                              itemBuilder: (BuildContext context) {
+                                return {'Share', 'Copy Link', 'Members'}
+                                    .map((String choice) {
+                                  return PopupMenuItem<String>(
+                                    value: choice,
+                                    child: Text(choice),
+                                  );
+                                }).toList();
+                              },
+                            )
+                          ],
                         ),
                       ),
-                      SizedBox(height: 8), // Reduced height
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            double screenWidth = constraints.maxWidth;
-                            return ListView.builder(
-                              itemCount: tasks.length,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8.0), // Reduced padding
-                                  width: screenWidth < 600 ? screenWidth * 0.9 : screenWidth * 0.8,
-                                  child: TaskItem(
-                                    taskNumber: (index + 1).toString(),
-                                    taskName: tasks[index].taskName,
-                                    progress: tasks[index].progress,
-                                    fontSize: taskNameFontSize, // Dynamic font size
-                                  ),
-                                );
-                              },
+
+
+                      Container(
+                        height: MediaQuery.of(context).size.height * 0.2, // Takes 50% of screen height
+                        child: ListView.builder(
+                          itemCount: tasks.length,
+                          itemBuilder: (context, index) {
+                            return TaskItem(
+                              taskNumber: (index + 1).toString(),
+                              taskName: tasks[index].taskName,
+                              progress: tasks[index].progress,
                             );
                           },
                         ),
                       ),
-                      SizedBox(height: 8), // Reduced height
+
+
+
+                      Spacer(),
+                      // Conditionally show the "Manage Tasks" button
                       if (FirebaseAuth.instance.currentUser?.uid == creatorId)
                         Center(
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced padding
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
                             ),
                             onPressed: _showTaskPopup,
                             child: Text(
                               'Manage Tasks',
-                              style: TextStyle(fontSize: manageTasksButtonFontSize, color: Colors.white),
+                              style:
+                              TextStyle(fontSize: 12, color: Colors.white),
                             ),
                           ),
                         ),
@@ -602,8 +596,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       ),
     );
   }
-
-
 }
 
 class TaskManager extends StatefulWidget {
@@ -632,6 +624,37 @@ class _TaskManagerState extends State<TaskManager> {
     setState(() {
       taskNames.remove(task);
     });
+    _removeTaskFromFirestore(task); // Remove from Firestore
+  }
+
+  Future<void> _removeTaskFromFirestore(String taskName) async {
+    try {
+      if (widget.groupId.isEmpty) {
+        throw Exception('Group ID is empty');
+      }
+
+      // Fetch the group document
+      DocumentReference groupDoc = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+
+      // Remove the task from the group's Firestore document
+      await groupDoc.update({
+        'tasks': FieldValue.arrayRemove([{'task': taskName}]),
+      });
+
+      // Optionally, remove from the current user's todoTasks collection if needed
+      String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+      if (currentUserId != null) {
+        DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(currentUserId);
+
+        // Remove the task from the user's 'todoTasks' collection
+        await userDoc.update({
+          'todoTasks': FieldValue.arrayRemove([{'task': taskName}]),
+        });
+      }
+    } catch (e) {
+      print('Error removing task from Firestore: $e');
+    }
   }
 
   Future<void> _addTaskToFirestore(String taskName) async {
@@ -665,13 +688,13 @@ class _TaskManagerState extends State<TaskManager> {
     }
   }
 
+
+
 // Function to calculate task priority based on the due date
   int _calculateTaskPriority(DateTime dueDate) {
     DateTime today = DateTime.now();
     // Example logic: Priority decreases as the task date is further in the future
-    int daysUntilDue = dueDate
-        .difference(today)
-        .inDays;
+    int daysUntilDue = dueDate.difference(today).inDays;
     return daysUntilDue <= 7 ? 1 : 2; // High priority if within 7 days
   }
 
@@ -716,17 +739,6 @@ class _TaskManagerState extends State<TaskManager> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the screen width
-    double screenWidth = MediaQuery
-        .of(context)
-        .size
-        .width;
-
-    // Determine font size based on screen width
-    double fontSize = screenWidth < 600
-        ? 16
-        : 20; // Smaller font for mobile view
-
     return Container(
       width: 350,
       padding: EdgeInsets.all(16),
@@ -744,7 +756,7 @@ class _TaskManagerState extends State<TaskManager> {
                 'Manage Tasks',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: fontSize,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -762,12 +774,11 @@ class _TaskManagerState extends State<TaskManager> {
           ),
           SizedBox(height: 20),
           ...taskNames
-              .map((task) =>
-              TaskPopupItem(
-                task: task,
-                groupId: widget.groupId,
-                onTaskDeleted: _handleTaskDeletion,
-              ))
+              .map((task) => TaskPopupItem(
+            task: task,
+            groupId: widget.groupId,
+            onTaskDeleted: _handleTaskDeletion,
+          ))
               .toList(),
           SizedBox(height: 20),
           Align(
@@ -819,23 +830,38 @@ class TaskPopupItem extends StatelessWidget {
     if (confirm == true) {
       try {
         DocumentReference groupDoc =
-            FirebaseFirestore.instance.collection('groups').doc(groupId);
-        await groupDoc.update({
-          'tasks': FieldValue.arrayRemove([
-            {
-              'task': task,
-              'progress': 0.0, // Ensure this matches the initial progress value
-            }
-          ]),
-        });
+        FirebaseFirestore.instance.collection('groups').doc(groupId);
 
-        // Notify the parent to update the UI
-        onTaskDeleted(task);
+        // Fetch the current tasks from Firestore
+        DocumentSnapshot snapshot = await groupDoc.get();
+        List<dynamic> tasks = snapshot['tasks'];
+
+        // Find the task object to remove (matching by task name or other fields)
+        Map<String, dynamic>? taskToRemove;
+        for (var task in tasks) {
+          if (task['task'] == this.task) {
+            taskToRemove = task;
+            break;
+          }
+        }
+
+        if (taskToRemove != null) {
+          // Remove the full task object from Firestore
+          await groupDoc.update({
+            'tasks': FieldValue.arrayRemove([taskToRemove]),
+          });
+
+          // Notify the parent to update the UI
+          onTaskDeleted(this.task);
+        } else {
+          print('Task not found for deletion');
+        }
       } catch (e) {
         print('Error deleting task: $e');
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -885,7 +911,7 @@ class TaskItem extends StatelessWidget {
   TaskItem({
     required this.taskNumber,
     required this.taskName,
-    required this.progress, required fontSize,
+    required this.progress,
   });
 
   @override
@@ -913,29 +939,29 @@ class TaskItem extends StatelessWidget {
               ),
             ),
           ),
-          // Container(
-          //   width: 200,
-          //   child: SliderTheme(
-          //     data: SliderThemeData(
-          //       trackHeight: 18.0,
-          //       thumbShape: SliderComponentShape.noThumb,
-          //       overlayShape: SliderComponentShape.noOverlay,
-          //       activeTrackColor: Colors.green,
-          //       inactiveTrackColor: Colors.grey[300],
-          //       thumbColor: Colors.transparent,
-          //       overlayColor: Colors.transparent,
-          //     ),
-          //     child: Slider(
-          //       value: progress,
-          //       min: 0.0,
-          //       max: 1.0,
-          //       onChanged: (value) {
-          //         // You might want to handle slider changes if needed
-          //       },
-          //       divisions: 10,
-          //     ),
-          //   ),
-          // ),
+          Container(
+            width: 200,
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 18.0,
+                thumbShape: SliderComponentShape.noThumb,
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: Colors.green,
+                inactiveTrackColor: Colors.grey[300],
+                thumbColor: Colors.transparent,
+                overlayColor: Colors.transparent,
+              ),
+              child: Slider(
+                value: progress,
+                min: 0.0,
+                max: 1.0,
+                onChanged: (value) {
+                  // You might want to handle slider changes if needed
+                },
+                divisions: 10,
+              ),
+            ),
+          ),
         ],
       ),
     );
