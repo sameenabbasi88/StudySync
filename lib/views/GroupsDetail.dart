@@ -775,13 +775,20 @@ class _TaskManagerState extends State<TaskManager> {
             ],
           ),
           SizedBox(height: 20),
-          ...taskNames
-              .map((task) => TaskPopupItem(
-            task: task,
-            groupId: widget.groupId,
-            onTaskDeleted: _handleTaskDeletion,
-          ))
-              .toList(),
+          // Wrap task list in SingleChildScrollView
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: taskNames
+                    .map((task) => TaskPopupItem(
+                  task: task,
+                  groupId: widget.groupId,
+                  onTaskDeleted: _handleTaskDeletion,
+                ))
+                    .toList(),
+              ),
+            ),
+          ),
           SizedBox(height: 20),
           Align(
             alignment: Alignment.bottomRight,
@@ -796,7 +803,6 @@ class _TaskManagerState extends State<TaskManager> {
     );
   }
 }
-
 class TaskPopupItem extends StatelessWidget {
   final String task;
   final String groupId;

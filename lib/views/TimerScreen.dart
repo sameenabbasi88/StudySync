@@ -109,7 +109,6 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
-
   void _startButtonTimer() {
     setState(() {
       _isStopwatchSelected = true; // Set to true for stopwatch
@@ -326,15 +325,23 @@ class _TimerScreenState extends State<TimerScreen> {
     }
   }
 
-  void _startUserDefinedTimer(int minutes) {
+  void _setUserDefinedTimer(int minutes) {
     setState(() {
       _seconds = minutes * 60; // Convert minutes to seconds
+      _isRunning = false;  // Timer is not running yet
+      _isPaused = false;
+      _isCompleted = false;
+    });
+  }
+
+  void _startUserDefinedTimer() {
+    setState(() {
       _isRunning = true;
       _isPaused = false;
       _isCompleted = false;
     });
 
-    // Start the countdown logic (e.g., using a Timer)
+    // Start the countdown logic (using a Timer)
     Timer.periodic(Duration(seconds: 1), (timer) {
       if (_seconds > 0) {
         setState(() {
@@ -347,6 +354,7 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
+// Function to show the timer dialog
   void _showTimerDialog(BuildContext context) {
     final TextEditingController _controller = TextEditingController();
 
@@ -371,9 +379,7 @@ class _TimerScreenState extends State<TimerScreen> {
               child: Text("SET"),
               onPressed: () {
                 int minutes = int.tryParse(_controller.text) ?? 25; // Default to 25 minutes if input is invalid
-                setState(() {
-                  _seconds = minutes * 60; // Convert minutes to seconds
-                });
+                _setUserDefinedTimer(minutes);  // Set the timer without starting it
                 Navigator.of(context).pop(); // Close the dialog
               },
             ),
@@ -382,6 +388,7 @@ class _TimerScreenState extends State<TimerScreen> {
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -418,13 +425,14 @@ class _TimerScreenState extends State<TimerScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              // Display the formatted time
                               Text(
-                                _formatTime(_seconds),
+                                _formatTime(_seconds),  // Just display time, don't trigger timer logic here
                                 style: TextStyle(fontSize: 30, color: Colors.white),
                               ),
                               SizedBox(height: 5),
 
-                              // Start button for Pomodoro
+                              // Start button for Pomodoro Timer (when not running or completed)
                               if (isPomodoro && !_isRunning && !_isCompleted)
                                 ElevatedButton(
                                   onPressed: !_isCompleted ? _startPomodoroTimer : null,
@@ -434,27 +442,31 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                                 ),
 
-                              // Start button for User Defined Timer
-                              if (!isPomodoro && !_isStopwatchSelected && !_isRunning && !_isCompleted)
+                              // Start button for User Defined Timer (only show if the timer is set but not started)
+                              if (!isPomodoro && !_isRunning && !_isCompleted && _seconds > 0)
                                 ElevatedButton(
-                                  onPressed: !_isCompleted ? () => _showTimerDialog(context) : null,
-                                  child: Text("Start", style: TextStyle(fontSize: 10)),
+                                  onPressed: () {
+                                    _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
+                                  },
+                                  child: Text("START", style: TextStyle(fontSize: 10)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
                                 ),
 
-                              // Stopwatch Start Button (Step 3: Conditional rendering)
+                              // Stopwatch Start Button
                               if (_isStopwatchSelected && !_isRunning && !_isCompleted)
                                 ElevatedButton(
-                                  onPressed: !_isCompleted ? _startButtonTimer : null,
+                                  onPressed: () {
+                                    _startButtonTimer();  // Only start stopwatch when pressed
+                                  },
                                   child: Text("START STOPWATCH", style: TextStyle(fontSize: 10)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
                                 ),
 
-                              // Pause button
+                              // Other buttons like Pause, Resume, Finish (conditionally rendered)
                               if (_isRunning && !_isPaused)
                                 ElevatedButton(
                                   onPressed: _pauseTimer,
@@ -464,20 +476,16 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                                 ),
 
-                              // Resume button
                               if (_isPaused)
                                 ElevatedButton(
                                   onPressed: _onResumeButtonPressed,
-                                  child: Text('Resume', style: TextStyle(fontSize: 12)),
+                                  child: Text("RESUME", style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                   ),
                                 ),
 
-                              SizedBox(height: 5),
-
-                              // Finish button
-                              if (_isRunning)
+                              if (_isRunning || _isPaused)
                                 ElevatedButton(
                                   onPressed: _completeTask,
                                   child: Text("FINISH", style: TextStyle(fontSize: 12)),
@@ -487,15 +495,13 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
 
                               SizedBox(height: 10),
-
                               Text(
                                 "Timer is default",
                                 style: TextStyle(color: Colors.white, fontSize: 12),
                               ),
-
                               SizedBox(height: 10),
 
-                              // Wrap for Timer, Stopwatch, Pomodoro (disabled if _isCompleted is true)
+                              // Timer, Stopwatch, and Pomodoro options
                               Wrap(
                                 spacing: 8.0,
                                 children: [
@@ -503,20 +509,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                     onTap: !_isCompleted
                                         ? () {
                                       setState(() {
-                                        selectedOption = "TIMER"; // Update selected option
-                                        _showTimerDialog(context);
-                                        _isStopwatchSelected = false; // Reset stopwatch selection
+                                        selectedOption = "TIMER";
+                                        _isStopwatchSelected = false;
                                       });
+                                      _showTimerDialog(context); // Show timer dialog
                                     }
                                         : null,
                                     child: Stack(
                                       alignment: Alignment.bottomCenter,
                                       children: [
-                                        // Underline for selected option
                                         if (selectedOption == "TIMER")
                                           Container(
                                             height: 2,
-                                            width: 50, // Adjust width as needed
+                                            width: 50,
                                             color: Colors.white,
                                           ),
                                         Text(
@@ -530,8 +535,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                     onTap: !_isCompleted
                                         ? () {
                                       setState(() {
-                                        selectedOption = "STOPWATCH"; // Update selected option
-                                        _isStopwatchSelected = true; // Step 2: Update the stopwatch selection
+                                        selectedOption = "STOPWATCH";
+                                        _isStopwatchSelected = true;
                                         _resetToStartScreen();
                                       });
                                     }
@@ -539,11 +544,10 @@ class _TimerScreenState extends State<TimerScreen> {
                                     child: Stack(
                                       alignment: Alignment.bottomCenter,
                                       children: [
-                                        // Underline for selected option
                                         if (selectedOption == "STOPWATCH")
                                           Container(
                                             height: 2,
-                                            width: 80, // Adjust width as needed
+                                            width: 80,
                                             color: Colors.white,
                                           ),
                                         Text(
@@ -557,20 +561,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                     onTap: !_isCompleted
                                         ? () {
                                       setState(() {
-                                        selectedOption = "POMODORO"; // Update selected option
-                                        _setPomodoroTimer();
-                                        _isStopwatchSelected = false; // Reset stopwatch selection
+                                        selectedOption = "POMODORO";
+                                        _setPomodoroTimer();  // Set time, don't start automatically
+                                        _isStopwatchSelected = false;
                                       });
                                     }
                                         : null,
                                     child: Stack(
                                       alignment: Alignment.bottomCenter,
                                       children: [
-                                        // Underline for selected option
                                         if (selectedOption == "POMODORO")
                                           Container(
                                             height: 2,
-                                            width: 80, // Adjust width as needed
+                                            width: 80,
                                             color: Colors.white,
                                           ),
                                         Text(
@@ -587,6 +590,7 @@ class _TimerScreenState extends State<TimerScreen> {
                         ),
                       ),
                     ),
+
                     SizedBox(width: 16),
                     // Tasks Section
                     Expanded(
@@ -662,13 +666,14 @@ class _TimerScreenState extends State<TimerScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            // Display the formatted time
                             Text(
-                              _formatTime(_seconds),
+                              _formatTime(_seconds),  // Just display time, don't trigger timer logic here
                               style: TextStyle(fontSize: 30, color: Colors.white),
                             ),
                             SizedBox(height: 5),
 
-                            // Start button for Pomodoro
+                            // Start button for Pomodoro Timer (when not running or completed)
                             if (isPomodoro && !_isRunning && !_isCompleted)
                               ElevatedButton(
                                 onPressed: !_isCompleted ? _startPomodoroTimer : null,
@@ -678,27 +683,31 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
                               ),
 
-                            // Start button for User Defined Timer
-                            if (!isPomodoro && !_isRunning && !_isCompleted)
+                            // Start button for User Defined Timer (only show if the timer is set but not started)
+                            if (!isPomodoro && !_isRunning && !_isCompleted && _seconds > 0)
                               ElevatedButton(
-                                onPressed: !_isCompleted ? () => _showTimerDialog(context) : null,
-                                child: Text("SET TIMER", style: TextStyle(fontSize: 10)),
+                                onPressed: () {
+                                  _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
+                                },
+                                child: Text("START", style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                 ),
                               ),
 
-                            // Stopwatch Start Button (Step 3: Conditional rendering)
+                            // Stopwatch Start Button
                             if (_isStopwatchSelected && !_isRunning && !_isCompleted)
                               ElevatedButton(
-                                onPressed: !_isCompleted ? _startButtonTimer : null,
+                                onPressed: () {
+                                  _startButtonTimer();  // Only start stopwatch when pressed
+                                },
                                 child: Text("START STOPWATCH", style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                 ),
                               ),
 
-                            // Pause button
+                            // Other buttons like Pause, Resume, Finish (conditionally rendered)
                             if (_isRunning && !_isPaused)
                               ElevatedButton(
                                 onPressed: _pauseTimer,
@@ -708,20 +717,16 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
                               ),
 
-                            // Resume button
                             if (_isPaused)
                               ElevatedButton(
                                 onPressed: _onResumeButtonPressed,
-                                child: Text('Resume', style: TextStyle(fontSize: 12)),
+                                child: Text("RESUME", style: TextStyle(fontSize: 12)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                 ),
                               ),
 
-                            SizedBox(height: 5),
-
-                            // Finish button
-                            if (_isRunning)
+                            if (_isRunning || _isPaused)
                               ElevatedButton(
                                 onPressed: _completeTask,
                                 child: Text("FINISH", style: TextStyle(fontSize: 12)),
@@ -731,15 +736,13 @@ class _TimerScreenState extends State<TimerScreen> {
                               ),
 
                             SizedBox(height: 10),
-
                             Text(
                               "Timer is default",
                               style: TextStyle(color: Colors.white, fontSize: 12),
                             ),
-
                             SizedBox(height: 10),
 
-                            // Wrap for Timer, Stopwatch, Pomodoro (disabled if _isCompleted is true)
+                            // Timer, Stopwatch, and Pomodoro options
                             Wrap(
                               spacing: 8.0,
                               children: [
@@ -747,20 +750,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                   onTap: !_isCompleted
                                       ? () {
                                     setState(() {
-                                      selectedOption = "TIMER"; // Update selected option
-                                      _showTimerDialog(context);
-                                      _isStopwatchSelected = false; // Reset stopwatch selection
+                                      selectedOption = "TIMER";
+                                      _isStopwatchSelected = false;
                                     });
+                                    _showTimerDialog(context); // Show timer dialog
                                   }
                                       : null,
                                   child: Stack(
                                     alignment: Alignment.bottomCenter,
                                     children: [
-                                      // Underline for selected option
                                       if (selectedOption == "TIMER")
                                         Container(
                                           height: 2,
-                                          width: 50, // Adjust width as needed
+                                          width: 50,
                                           color: Colors.white,
                                         ),
                                       Text(
@@ -774,8 +776,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                   onTap: !_isCompleted
                                       ? () {
                                     setState(() {
-                                      selectedOption = "STOPWATCH"; // Update selected option
-                                      _isStopwatchSelected = true; // Step 2: Update the stopwatch selection
+                                      selectedOption = "STOPWATCH";
+                                      _isStopwatchSelected = true;
                                       _resetToStartScreen();
                                     });
                                   }
@@ -783,11 +785,10 @@ class _TimerScreenState extends State<TimerScreen> {
                                   child: Stack(
                                     alignment: Alignment.bottomCenter,
                                     children: [
-                                      // Underline for selected option
                                       if (selectedOption == "STOPWATCH")
                                         Container(
                                           height: 2,
-                                          width: 80, // Adjust width as needed
+                                          width: 80,
                                           color: Colors.white,
                                         ),
                                       Text(
@@ -801,20 +802,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                   onTap: !_isCompleted
                                       ? () {
                                     setState(() {
-                                      selectedOption = "POMODORO"; // Update selected option
-                                      _setPomodoroTimer();
-                                      _isStopwatchSelected = false; // Reset stopwatch selection
+                                      selectedOption = "POMODORO";
+                                      _setPomodoroTimer();  // Set time, don't start automatically
+                                      _isStopwatchSelected = false;
                                     });
                                   }
                                       : null,
                                   child: Stack(
                                     alignment: Alignment.bottomCenter,
                                     children: [
-                                      // Underline for selected option
                                       if (selectedOption == "POMODORO")
                                         Container(
                                           height: 2,
-                                          width: 80, // Adjust width as needed
+                                          width: 80,
                                           color: Colors.white,
                                         ),
                                       Text(
@@ -831,6 +831,9 @@ class _TimerScreenState extends State<TimerScreen> {
                       ),
                     ),
                   ),
+
+
+
 
                   SizedBox(height: 10),
                   // Tasks Section

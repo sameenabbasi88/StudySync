@@ -523,8 +523,6 @@ class _CalendarToDoPageState extends State<CalendarToDoPage> {
   }
 }
 
-
-
 class ToDoItem extends StatelessWidget {
   final String title;
   final DateTime initialDate;
