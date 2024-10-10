@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/views/GroupsPage.dart';
 import 'package:untitled/views/ProfilePage.dart';
 import 'package:untitled/views/StartStudyingPage.dart';
@@ -32,12 +33,15 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
   String selectedSection = 'studysync'; // Default section
   late TimerProvider timerProvider;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
+    _checkAuthState();
+    _restoreSelectedSection();
     timerProvider = TimerProvider();
-    timerProvider.startTimer();
+    timerProvider.initialize(); // Call the initialize method to set up the timer
     _setUserOnlineStatus(true);
 
     if (kIsWeb) {
@@ -61,30 +65,60 @@ class _StudySyncDashboardState extends State<StudySyncDashboard> {
 
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Update online status when dependencies change (e.g., navigating to a new page)
     _setUserOnlineStatus(true);
   }
 
   Future<void> _setUserOnlineStatus(bool isOnline) async {
+    if (!mounted) return; // Check if the widget is still mounted
     await _firestore.collection('users').doc(widget.userId).update({
       'isOnline': isOnline,
     });
   }
 
-  void onSectionChange(String section) {
-    setState(() {
-      selectedSection =
-          section; // Change the section without stopping the timer
-    });
+  Future<void> _checkAuthState() async {
+    if (!mounted) return; // Check if the widget is still mounted
+    User? user = _auth.currentUser;
+    if (user == null) {
+      // Handle unauthenticated state, like redirecting to a login page
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
+
+  void onSectionChange(String section) async {
+    setState(() {
+      selectedSection = section;
+    });
+    await _saveSelectedSection(section);
+  }
+
+  Future<void> _saveSelectedSection(String section) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selectedSection', section);
+  }
+
+  Future<void> _restoreSelectedSection() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? savedSection = prefs.getString('selectedSection');
+    if (savedSection != null) {
+      setState(() {
+        selectedSection = savedSection;
+      });
+    }
+  }
+
+
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return; // Check if the widget is still mounted
     if (state == AppLifecycleState.paused) {
       _setUserOnlineStatus(false);
     } else if (state == AppLifecycleState.resumed) {
       _setUserOnlineStatus(true);
     }
   }
+
+
+
 
 
   @override
@@ -153,6 +187,8 @@ class ToDoSection extends StatefulWidget {
 }
 
 class _ToDoSectionState extends State<ToDoSection> {
+  DateTime? selectedDate; // Define selectedDate here if you haven't already
+
   @override
   Widget build(BuildContext context) {
     User? currentUser = FirebaseAuth.instance.currentUser;
@@ -188,6 +224,7 @@ class _ToDoSectionState extends State<ToDoSection> {
                   color: Color(0xff003039),
                   borderRadius: BorderRadius.circular(10),
                 ),
+                constraints: BoxConstraints(maxHeight: 400), // Set a maximum height
                 child: Center(
                   child: Text(
                     'No tasks added or completed.',
@@ -226,74 +263,214 @@ class _ToDoSectionState extends State<ToDoSection> {
               });
 
             return Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Color(0xff003039),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Display TO-DO tasks
-                  Text(
-                    'TO-DO',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+              constraints: BoxConstraints(maxHeight: 400), // Set a maximum height for the container
+              child: SingleChildScrollView( // Make the entire section scrollable
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Color(0xff003039),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  SizedBox(height: 10),
-                  todoList.isEmpty
-                      ? Text(
-                    'No tasks added.',
-                    style: TextStyle(color: Colors.white),
-                  )
-                      : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: todoList.length,
-                    itemBuilder: (context, index) {
-                      return ToDoItem(
-                        title: todoList[index].title,
-                        taskId: todoList[index].taskId,
-                        initialDate: todoList[index].date,
-                        priority: todoList[index].priority,
-                        groupName: todoList[index].groupName,
-                        completionDate: todoList[index].completionDate,
-                      );
-                    },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Display TO-DO tasks
+                      Text(
+                        'TO-DO',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      todoList.isEmpty
+                          ? Text(
+                        'No tasks added.',
+                        style: TextStyle(color: Colors.white),
+                      )
+                          : Container(
+                        height: 100, // Set a specific height for the todo list
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          physics: AlwaysScrollableScrollPhysics(), // Allow scrolling even if the content fits
+                          itemCount: todoList.length,
+                          itemBuilder: (context, index) {
+                            return ToDoItem(
+                              title: todoList[index].title,
+                              taskId: todoList[index].taskId,
+                              initialDate: todoList[index].date,
+                              priority: todoList[index].priority,
+                              groupName: todoList[index].groupName,
+                              completionDate: todoList[index].completionDate,
+                            );
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      // Display Completed tasks
+                      Text(
+                        'Completed Tasks',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      completedTaskList.isEmpty
+                          ? Text(
+                        'No completed tasks.',
+                        style: TextStyle(color: Colors.white),
+                      )
+                          : Container(
+                        height: 100, // Set a specific height for the completed tasks list
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          physics: AlwaysScrollableScrollPhysics(), // Allow scrolling even if the content fits
+                          itemCount: completedTaskList.length,
+                          itemBuilder: (context, index) {
+                            return ToDoItem(
+                              title: completedTaskList[index].title,
+                              taskId: completedTaskList[index].taskId,
+                              initialDate: completedTaskList[index].completionDate,
+                              priority: completedTaskList[index].priority,
+                              groupName: completedTaskList[index].groupName,
+                              completionDate: completedTaskList[index].completionDate,
+                            );
+                          },
+                        ),
+                      ),
+
+                      SizedBox(height: 20),
+                      TextButton(
+                        onPressed: () {
+                          // Open a dialog to add a new task
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              TextEditingController taskTitleController = TextEditingController();
+                              DateTime? selectedDate; // Declare the selected date here
+
+                              return AlertDialog(
+                                title: Text('Add Task'),
+                                content: StatefulBuilder(
+                                  builder: (BuildContext context, StateSetter setState) {
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextField(
+                                          controller: taskTitleController,
+                                          decoration: InputDecoration(labelText: 'Task Title'),
+                                        ),
+                                        SizedBox(height: 16), // Add some space between the TextField and the date selector
+                                        GestureDetector(
+                                          onTap: () async {
+                                            // Show the date picker dialog
+                                            DateTime? pickedDate = await showDatePicker(
+                                              context: context,
+                                              initialDate: selectedDate ?? DateTime.now(),
+                                              firstDate: DateTime(2000),
+                                              lastDate: DateTime(2101),
+                                            );
+
+                                            if (pickedDate != null) {
+                                              // Update the selected date
+                                              setState(() {
+                                                selectedDate = pickedDate;
+                                              });
+                                            }
+                                          },
+                                          child: InputDecorator(
+                                            decoration: InputDecoration(
+                                              labelText: selectedDate != null
+                                                  ? 'Selected Date: ${selectedDate!.toLocal()}'.split(' ')[0] // Display selected date
+                                                  : 'Select Date',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Text(
+                                                selectedDate != null
+                                                    ? '${selectedDate!.toLocal()}'.split(' ')[0] // Display selected date
+                                                    : 'No date selected',
+                                                style: TextStyle(
+                                                  color: selectedDate != null ? Colors.black : Colors.grey,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop(); // Close the dialog
+                                    },
+                                    child: Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      String taskTitle = taskTitleController.text;
+
+                                      // Ensure the selected date is being used here
+                                      if (taskTitle.isNotEmpty && selectedDate != null) {
+                                        // Create a new task object
+                                        Map<String, dynamic> newTask = {
+                                          'title': taskTitle,
+                                          'date': Timestamp.fromDate(selectedDate!), // Use the selected date as a Timestamp
+                                          'priority': 1, // Set a default priority or get it from your app logic
+                                        };
+
+                                        // Save to Firestore
+                                        FirebaseFirestore.instance
+                                            .collection('todoTasks')
+                                            .doc(userId)
+                                            .set({
+                                          'Todotasks': FieldValue.arrayUnion([newTask])
+                                        }, SetOptions(merge: true)) // Merge to avoid overwriting other tasks
+                                            .then((_) {
+                                          Navigator.of(context).pop(); // Close the dialog
+                                        })
+                                            .catchError((error) {
+                                          print("Failed to add task: $error");
+                                        });
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Please enter a task title and select a date.')),
+                                        );
+                                      }
+                                    },
+                                    child: Text('Add Task'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        child: const Row(
+                          children: [
+                            Icon(Icons.add_circle, color: Colors.white),
+                            SizedBox(width: 20),
+                            Text(
+                              'Add Item',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+
+                    ],
                   ),
-                  SizedBox(height: 20),
-                  // Display Completed tasks
-                  Text(
-                    'Completed Tasks',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  completedTaskList.isEmpty
-                      ? Text(
-                    'No completed tasks.',
-                    style: TextStyle(color: Colors.white),
-                  )
-                      : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: completedTaskList.length,
-                    itemBuilder: (context, index) {
-                      return ToDoItem(
-                        title: completedTaskList[index].title,
-                        taskId: completedTaskList[index].taskId,
-                        initialDate: completedTaskList[index].completionDate, // Use completionDate here
-                        priority: completedTaskList[index].priority,
-                        groupName: completedTaskList[index].groupName,
-                        completionDate: completedTaskList[index].completionDate,
-                      );
-                    },
-                  ),
-                ],
+                ),
               ),
             );
           },
@@ -302,6 +479,7 @@ class _ToDoSectionState extends State<ToDoSection> {
     );
   }
 }
+
 
 
 // TodoTask model update to include groupName

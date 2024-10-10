@@ -9,14 +9,15 @@ class TimerProvider with ChangeNotifier {
   DateTime? _startTime;
 
   TimerProvider() {
-    _startTimer();
+    // Initialize without starting the timer immediately
   }
 
-  void _startTimer() async {
-    if (_timer?.isActive ?? false) return;
+  Future<void> initialize() async {
+    await _loadPreviousDuration(); // Load previous duration
+    _startTimer(); // Start the timer after loading the duration
+  }
 
-    _startTime = DateTime.now();
-
+  Future<void> _loadPreviousDuration() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
     String userId = currentUser?.uid ?? '';
 
@@ -32,11 +33,25 @@ class TimerProvider with ChangeNotifier {
           String previousDurationStr = sessionData['duration'] ?? '0:0:0';
           Duration previousDuration = _parseDuration(previousDurationStr);
 
+          // Load the previous duration into the notifier
           sessionDurationNotifier.value = previousDuration;
         }
       } catch (e) {
         print('Error fetching previous session time: $e');
       }
+    }
+  }
+
+  void _startTimer() {
+    if (_timer?.isActive ?? false) return;
+
+    // Start time is set to now, if the timer was previously stopped
+    if (sessionDurationNotifier.value.inSeconds > 0) {
+      // If the session duration is not zero, continue from that duration
+      _startTime = DateTime.now().subtract(sessionDurationNotifier.value);
+    } else {
+      // If it's zero, set start time to now
+      _startTime = DateTime.now();
     }
 
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -88,7 +103,7 @@ class TimerProvider with ChangeNotifier {
         await FirebaseFirestore.instance.collection('sessionLogs').doc(userId).update({
           'endTime': Timestamp.fromDate(endTime),
         });
-        sessionDurationNotifier.value = Duration.zero;
+        // Keep the session duration instead of resetting it to zero
       } catch (e) {
         print('Error saving session time: $e');
       }
