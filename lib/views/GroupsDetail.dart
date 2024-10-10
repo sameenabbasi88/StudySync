@@ -158,7 +158,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
     });
   }
 
-  Future<void> _updateTodoTasks(List<dynamic> newTasks) async {
+  Future<void> _updateTodoTasks(List<Task> newTasks) async {
     try {
       DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
           .collection('groups')
@@ -171,23 +171,27 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
         for (var follower in followers) {
           String followerId = follower['userId'].toString();
 
+          List<Map<String, dynamic>> taskDataList = newTasks.map((task) {
+            DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
+            int taskPriority = _calculateTaskPriority(date); // Calculate the priority
+            String formattedDate = DateFormat('MM-dd-yyyy').format(date);
+
+            // Ensure proper structure for tasks
+            return {
+              'title': task.taskName,   // Access the task name properly
+              'progress': task.progress, // Include progress field if needed
+              'userId': followerId,
+              'date': formattedDate,
+              'priority': taskPriority,
+              'groupName': groupName,
+            };
+          }).toList();
+
           await FirebaseFirestore.instance
               .collection('todoTasks')
               .doc(followerId)
               .set({
-            'Todotasks': FieldValue.arrayUnion(newTasks.map((taskData) {
-              DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
-              int taskPriority = _calculateTaskPriority(date); // Calculate the priority
-              String formattedDate = DateFormat('MM-dd-yyyy').format(date);
-
-              return {
-                'title': taskData['task'],
-                'userId': followerId,
-                'date': formattedDate,
-                'priority': taskPriority,
-                'groupName': groupName,
-              };
-            }).toList()),
+            'Todotasks': FieldValue.arrayUnion(taskDataList),
           }, SetOptions(merge: true));
         }
       }
@@ -195,6 +199,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Error updating todoTasks for followers: $e');
     }
   }
+
 
   Future<void> _fetchMembers() async {
     try {
@@ -379,7 +384,6 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Error toggling follow status: $e');
     }
   }
-
 
   void _copyGroupLink() {
     final String groupLink =
@@ -687,8 +691,6 @@ class _TaskManagerState extends State<TaskManager> {
       print('Error adding task to Firestore: $e');
     }
   }
-
-
 
 // Function to calculate task priority based on the due date
   int _calculateTaskPriority(DateTime dueDate) {
