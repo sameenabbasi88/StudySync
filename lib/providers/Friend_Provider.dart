@@ -8,6 +8,7 @@ class FriendProvider with ChangeNotifier {
   List<Map<String, dynamic>> _displayedFriendsList = [];
   String? userEmail;
   String? errorMessage;
+  String? currentUserName;
 
   List<String> get addedFriends => _addedFriends;
   List<Map<String, dynamic>> get friendsList => _friendsList;
@@ -19,6 +20,9 @@ class FriendProvider with ChangeNotifier {
     _fetchFriendsList();
   }
 
+  void initialize(String userName) {
+    currentUserName = userName;
+  }
   void _getUserEmail() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -64,11 +68,15 @@ class FriendProvider with ChangeNotifier {
 
       final friendEmail = querySnapshot.docs.first['email'];
 
+      // Prevent adding self as a friend
       if (friendEmail == userEmail) {
         errorMessage = 'You cannot add yourself as a friend';
         notifyListeners();
         return;
       }
+
+      // Clear previous error message if the condition no longer applies
+      errorMessage = null;
 
       if (_addedFriends.contains(friendName)) return;
 
@@ -81,6 +89,7 @@ class FriendProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
 
   void searchFriends(String query) async {
     if (query.isEmpty) {

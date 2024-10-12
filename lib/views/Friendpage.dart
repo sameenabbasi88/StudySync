@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/Friend_Provider.dart';
+import '../utils/color.dart';
 
 class FriendsPage extends StatelessWidget {
   final TextEditingController _usernameController = TextEditingController();
@@ -94,11 +95,22 @@ class FriendsPage extends StatelessWidget {
                                       size: adjustedIconSize,
                                     ),
                                     onPressed: () {
+                                      // Check if the user is trying to add themselves
+                                      final currentUser = friendProvider.currentUserName;
+                                      if (name == currentUser) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text("You cannot add yourself as a friend!")),
+                                        );
+                                        return;
+                                      }
+
                                       if (!friendProvider.addedFriends.contains(name)) {
                                         friendProvider.addFriend(name);
                                       }
                                     },
                                   ),
+
+
                                 );
                               },
                             ),
@@ -216,11 +228,21 @@ class FriendsPage extends StatelessWidget {
                                       size: adjustedIconSize,
                                     ),
                                     onPressed: () {
+                                      // Check if the user is trying to add themselves
+                                      final currentUser = friendProvider.currentUserName;
+                                      if (name == currentUser) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text("You cannot add yourself as a friend!")),
+                                        );
+                                        return;
+                                      }
+
                                       if (!friendProvider.addedFriends.contains(name)) {
                                         friendProvider.addFriend(name);
                                       }
                                     },
                                   ),
+
                                 );
                               },
                             ),

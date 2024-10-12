@@ -226,16 +226,127 @@ class _ToDoSectionState extends State<ToDoSection> {
                 ),
                 constraints: BoxConstraints(maxHeight: 400), // Set a maximum height
                 child: Center(
-                  child: Text(
-                    'No tasks added or completed.',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                  child: TextButton(
+                    onPressed: () {
+                      // Open the dialog to add a new task
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          TextEditingController taskTitleController = TextEditingController();
+                          DateTime? selectedDate;
+
+                          return AlertDialog(
+                            title: Text('Add Task'),
+                            content: StatefulBuilder(
+                              builder: (BuildContext context, StateSetter setState) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextField(
+                                      controller: taskTitleController,
+                                      decoration: InputDecoration(labelText: 'Task Title'),
+                                    ),
+                                    SizedBox(height: 16),
+                                    GestureDetector(
+                                      onTap: () async {
+                                        DateTime? pickedDate = await showDatePicker(
+                                          context: context,
+                                          initialDate: selectedDate ?? DateTime.now(),
+                                          firstDate: DateTime(2000),
+                                          lastDate: DateTime(2101),
+                                        );
+
+                                        if (pickedDate != null) {
+                                          setState(() {
+                                            selectedDate = pickedDate;
+                                          });
+                                        }
+                                      },
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: selectedDate != null
+                                              ? 'Selected Date: ${selectedDate!.toLocal()}'.split(' ')[0]
+                                              : 'Select Date',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            selectedDate != null
+                                                ? '${selectedDate!.toLocal()}'.split(' ')[0]
+                                                : 'No date selected',
+                                            style: TextStyle(
+                                              color: selectedDate != null ? Colors.black : Colors.grey,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  String taskTitle = taskTitleController.text;
+                                  if (taskTitle.isNotEmpty && selectedDate != null) {
+                                    Map<String, dynamic> newTask = {
+                                      'title': taskTitle,
+                                      'date': Timestamp.fromDate(selectedDate!),
+                                      'priority': 1,
+                                    };
+
+                                    FirebaseFirestore.instance
+                                        .collection('todoTasks')
+                                        .doc(userId)
+                                        .set({
+                                      'Todotasks': FieldValue.arrayUnion([newTask])
+                                    }, SetOptions(merge: true))
+                                        .then((_) {
+                                      Navigator.of(context).pop();
+                                    }).catchError((error) {
+                                      print("Failed to add task: $error");
+                                    });
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Please enter a task title and select a date.')),
+                                    );
+                                  }
+                                },
+                                child: Text('Add Task'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_circle, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add Item',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               );
             }
+
 
             // Fetching TO-DO Tasks
             List<dynamic> tasks = todoSnapshot.data!.get('Todotasks') ?? [];
@@ -480,8 +591,6 @@ class _ToDoSectionState extends State<ToDoSection> {
   }
 }
 
-
-
 // TodoTask model update to include groupName
 class TodoTask {
   final String title;
@@ -725,7 +834,6 @@ class _ToDoItemState extends State<ToDoItem> {
     );
   }
 }
-
 
 class StatsSection extends StatelessWidget {
   final ValueNotifier<Duration> sessionDurationNotifier;

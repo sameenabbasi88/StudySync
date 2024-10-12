@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:untitled/views/studysyncmain.dart';
+
 import 'SignupPage.dart';
 
 class StudySyncLoginApp extends StatelessWidget {
@@ -26,7 +27,8 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
   final _passwordController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? currentUser;
-
+  bool _isLoading = false;
+  bool _obscureText=true;
   @override
   void initState() {
     super.initState();
@@ -49,8 +51,20 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
     super.dispose();
   }
 
-
   Future<void> _signIn() async {
+    setState(() {
+      _isLoading = true; // Show the loading indicator
+    });
+
+    // Validate email and password fields
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      setState(() {
+        _isLoading = false; // Hide the loading indicator
+      });
+      showErrorDialog('Email and password cannot be empty.');
+      return; // Exit the method
+    }
+
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
@@ -78,6 +92,10 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
       // Show error dialog for wrong credentials
       showErrorDialog('Incorrect credentials. Please try again.');
       print('Error signing in: $e');
+    } finally {
+      setState(() {
+        _isLoading = false; // Hide the loading indicator
+      });
     }
   }
 
@@ -126,7 +144,7 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
         fit: StackFit.expand,
         children: [
           Image.asset(
-            'assets/images/bg.jpg',
+            'images/bg.jpg',
             fit: BoxFit.cover,
           ),
           Center(
@@ -137,97 +155,113 @@ class _StudySyncLoginPageState extends State<StudySyncLoginPage> with WidgetsBin
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'WELCOME !',
-                                style: _responsiveTextStyle(36, context),  // Base font size is 36
-                              ),
+                    if (_isLoading)
+                      Center(
+                        child: CircularProgressIndicator(), // Show loading spinner
+                      )else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'WELCOME !',
+                                  style: _responsiveTextStyle(36, context),  // Base font size is 36
+                                ),
 
-                              SizedBox(height: 20),
-                            ],
+                                SizedBox(height: 20),
+                              ],
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(height: 70),
-                              Text(
-                                'Sign in',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              SizedBox(height: 20),
-                              TextField(
-                                controller: _emailController,
-                                decoration: InputDecoration(
-                                  labelText: 'Email Address',
-                                  border: OutlineInputBorder(),
-                                  labelStyle: TextStyle(color: Colors.black87),
-                                ),
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                              SizedBox(height: 20),
-                              TextField(
-                                controller: _passwordController,
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  border: OutlineInputBorder(),
-                                  labelStyle: TextStyle(color: Colors.black87),
-                                ),
-                                obscureText: true,
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                              InkWell(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return ForgotPasswordDialog();
-                                    },
-                                  );
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 0.0),
-                                  child: Text(
-                                    'Forget password?',
-                                    style: TextStyle(color: Colors.black87),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(height: 70),
+                                Text(
+                                  'Sign in',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
                                   ),
                                 ),
-                              ),
-                              SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: _signIn,
-                                child: Text('Sign In',
-                                    style: TextStyle(color: Colors.black87)),
-                              ),
-                              SizedBox(height: 10),
-                              InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) =>
-                                        StudySyncSignupApp()),
-                                  );
-                                },
-                                child: Text(
-                                  'Not registered yet? Signup',
+                                SizedBox(height: 20),
+                                TextField(
+                                  controller: _emailController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Email Address',
+                                    border: OutlineInputBorder(),
+                                    labelStyle: TextStyle(color: Colors.black87),
+                                  ),
                                   style: TextStyle(color: Colors.black87),
                                 ),
-                              )
-                            ],
+                                SizedBox(height: 20),
+                                TextField(
+                                  controller: _passwordController,
+                                  decoration: InputDecoration(
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                                        color: Colors.black87,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscureText = !_obscureText;
+                                        });
+                                      },
+                                    ),
+                                    labelText: 'Password',
+                                    border: OutlineInputBorder(),
+                                    labelStyle: TextStyle(color: Colors.black87),
+                                  ),
+                                  obscureText: _obscureText, // Use the _obscureText variable to toggle visibility
+                                  style: TextStyle(color: Colors.black87),
+                                ),
+
+                                InkWell(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return ForgotPasswordDialog();
+                                      },
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 0.0),
+                                    child: Text(
+                                      'Forget password?',
+                                      style: TextStyle(color: Colors.black87),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 20),
+                                ElevatedButton(
+                                  onPressed: _signIn,
+                                  child: Text('Sign In',
+                                      style: TextStyle(color: Colors.black87)),
+                                ),
+                                SizedBox(height: 10),
+                                InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) =>
+                                          StudySyncSignupApp()),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Not registered yet? Signup',
+                                    style: TextStyle(color: Colors.black87),
+                                  ),
+                                )
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     Container(
                       margin: EdgeInsets.only(top: 50),
                       child: Align(

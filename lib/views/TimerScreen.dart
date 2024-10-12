@@ -443,7 +443,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
 
                               // Start button for User Defined Timer (only show if the timer is set but not started)
-                              if (!isPomodoro && !_isRunning && !_isCompleted && _seconds > 0)
+                              if (!isPomodoro && !_isRunning && !_isCompleted )
                                 ElevatedButton(
                                   onPressed: () {
                                     _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
@@ -684,7 +684,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               ),
 
                             // Start button for User Defined Timer (only show if the timer is set but not started)
-                            if (!isPomodoro && !_isRunning && !_isCompleted && _seconds > 0)
+                            if (!isPomodoro && !_isRunning && !_isCompleted)
                               ElevatedButton(
                                 onPressed: () {
                                   _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
