@@ -17,9 +17,6 @@ class _GroupsPageState extends State<GroupsPage> {
   TextEditingController searchController = TextEditingController(); // Controller for search
   String? selectedGroup;
   String searchQuery = ''; // Variable to hold search query
-
-
-
   @override
   Widget build(BuildContext context) {
     final friendProvider = Provider.of<FriendProvider>(context);
@@ -467,13 +464,14 @@ class _GroupsPageState extends State<GroupsPage> {
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: selectedColor == color ? Colors.white : Colors.transparent,
+            color: Colors.transparent, // Set to transparent to remove the border
             width: 2,
           ),
         ),
       ),
     );
   }
+
 
   void _addNewGroup(String groupName, Color color) async {
     try {

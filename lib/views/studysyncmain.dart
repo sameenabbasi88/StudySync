@@ -884,32 +884,86 @@ class StatBox extends StatelessWidget {
   }
 }
 
-class StartStudyingButton extends StatelessWidget {
+
+class StartStudyingButton extends StatefulWidget {
+  @override
+  _StartStudyingButtonState createState() => _StartStudyingButtonState();
+}
+
+class _StartStudyingButtonState extends State<StartStudyingButton> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xff003039),
-          padding: EdgeInsets.symmetric(vertical: 16),
-        ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CalendarToDoPage()
-            ),
-          );
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            _isHovered = true;
+          });
         },
-        child: Text(
-          'START STUDYING',
-          style: TextStyle(fontSize: 20, color: Colors.white),
+        onExit: (_) {
+          setState(() {
+            _isHovered = false;
+          });
+        },
+        child: GestureDetector(
+          onTapDown: (_) {
+            setState(() {
+              _isPressed = true;
+            });
+          },
+          onTapUp: (_) {
+            setState(() {
+              _isPressed = false;
+            });
+          },
+          onTapCancel: () {
+            setState(() {
+              _isPressed = false;
+            });
+          },
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => CalendarToDoPage()),
+            );
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            decoration: BoxDecoration(
+              color: _isPressed
+                  ? Colors.teal[800] // Darker color when pressed
+                  : _isHovered
+                  ? Colors.teal // Lighter color when hovered
+                  : Color(0xff003039), // Default color
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                if (_isHovered)
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+              ],
+            ),
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                'START STUDYING',
+                style: TextStyle(fontSize: 20, color: Colors.white),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
 
 
 

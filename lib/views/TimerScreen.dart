@@ -433,7 +433,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               SizedBox(height: 5),
 
                               // Start button for Pomodoro Timer (when not running or completed)
-                              if (isPomodoro && !_isRunning && !_isCompleted)
+                              if (isPomodoro && !_isRunning && !_isCompleted && !_isPaused)
                                 ElevatedButton(
                                   onPressed: !_isCompleted ? _startPomodoroTimer : null,
                                   child: Text("START", style: TextStyle(fontSize: 10)),
@@ -443,7 +443,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
 
                               // Start button for User Defined Timer (only show if the timer is set but not started)
-                              if (!isPomodoro && !_isRunning && !_isCompleted )
+                              if (!isPomodoro && !_isStopwatchSelected && !_isRunning && !_isCompleted && !_isPaused)
                                 ElevatedButton(
                                   onPressed: () {
                                     _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
@@ -455,7 +455,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
 
                               // Stopwatch Start Button
-                              if (_isStopwatchSelected && !_isRunning && !_isCompleted)
+                              if (_isStopwatchSelected && !_isRunning && !_isCompleted && !_isPaused)
                                 ElevatedButton(
                                   onPressed: () {
                                     _startButtonTimer();  // Only start stopwatch when pressed
@@ -674,7 +674,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             SizedBox(height: 5),
 
                             // Start button for Pomodoro Timer (when not running or completed)
-                            if (isPomodoro && !_isRunning && !_isCompleted)
+                            if (isPomodoro && !_isRunning && !_isCompleted && !_isPaused)
                               ElevatedButton(
                                 onPressed: !_isCompleted ? _startPomodoroTimer : null,
                                 child: Text("START", style: TextStyle(fontSize: 10)),
@@ -684,7 +684,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               ),
 
                             // Start button for User Defined Timer (only show if the timer is set but not started)
-                            if (!isPomodoro && !_isRunning && !_isCompleted)
+                            if (!isPomodoro && !_isStopwatchSelected && !_isRunning && !_isCompleted && !_isPaused)
                               ElevatedButton(
                                 onPressed: () {
                                   _startUserDefinedTimer();  // Start the user-defined timer when the button is pressed
@@ -696,7 +696,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               ),
 
                             // Stopwatch Start Button
-                            if (_isStopwatchSelected && !_isRunning && !_isCompleted)
+                            if (_isStopwatchSelected && !_isRunning && !_isCompleted && !_isPaused)
                               ElevatedButton(
                                 onPressed: () {
                                   _startButtonTimer();  // Only start stopwatch when pressed

@@ -25,6 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _favoriteSubjectController = TextEditingController();
 
+
   @override
   void initState() {
     super.initState();
@@ -264,6 +265,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                   }).toList();
                                   String groupsList = groupNames.join(', ');
 
+                                  // Fetch the streak number
+                                  int streakNumber = userDoc.containsKey('streakNumber') ? userDoc['streakNumber'] : 0; // Default to 0 if not set
+
                                   return Container(
                                     padding: EdgeInsets.all(8), // Increased padding for better touch targets
                                     color: Colors.grey[300],
@@ -299,8 +303,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                           'In Groups: $groupsList',
                                           style: TextStyle(fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 16, color: Colors.black87),
                                         ),
+                                        // Display the streak number
                                         Text(
-                                          'Favorite Subject: ${userDoc.containsKey('favoriteSubject') ? userDoc['favoriteSubject'] : 'Not set'}',
+                                          'Streak Number: $streakNumber',
                                           style: TextStyle(fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 16, color: Colors.black87),
                                         ),
                                         Spacer(),
@@ -325,11 +330,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ],
                                     ),
                                   );
-
                                 },
                               ),
                             ),
                           ),
+
                         ],
                       ),
                     ),

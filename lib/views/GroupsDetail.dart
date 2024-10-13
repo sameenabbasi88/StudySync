@@ -5,8 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'GroupsPage.dart';
-
 class TaskManagerApp extends StatelessWidget {
   final String groupId;
 
@@ -510,7 +508,7 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
                                 ),
                               ),
                               child: Text(
-                                isFollowing ? 'Following' : 'Follow',
+                                isFollowing ? 'Following' : 'join',
                                 style: TextStyle(
                                     fontSize: MediaQuery.of(context).size.width < 600 ? 10 : 14,
                                     color: Colors.white),
