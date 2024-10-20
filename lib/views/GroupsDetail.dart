@@ -359,6 +359,9 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
               {'userId': userId}
             ]),
           });
+
+          // Remove group tasks from user's todoTasks
+          await _removeGroupTasksFromUser(userId);
         } else {
           // Follow logic
           await userDoc.update({
@@ -374,6 +377,9 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
               {'userId': userId}
             ]),
           });
+
+          // Add group tasks to user's todoTasks
+          await _addGroupTasksToUser(userId);
         }
 
         setState(() {
@@ -384,6 +390,62 @@ class _TaskManagerScreenState extends State<TaskManagerScreen> {
       print('Error toggling follow status: $e');
     }
   }
+
+  Future<void> _addGroupTasksToUser(String userId) async {
+    try {
+      List<Map<String, dynamic>> taskDataList = tasks.map((task) {
+        DateTime date = DateTime.now().add(Duration(days: 7)); // Example date
+        int taskPriority = _calculateTaskPriority(date); // Calculate the priority
+        String formattedDate = DateFormat('MM-dd-yyyy').format(date);
+
+        return {
+          'title': task.taskName,
+          'progress': task.progress,
+          'userId': userId,
+          'date': formattedDate,
+          'priority': taskPriority,
+          'groupName': groupName,
+        };
+      }).toList();
+
+      await FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId)
+          .set({
+        'Todotasks': FieldValue.arrayUnion(taskDataList),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error adding group tasks to user: $e');
+    }
+  }
+
+  Future<void> _removeGroupTasksFromUser(String userId) async {
+    try {
+      DocumentSnapshot userTasksSnapshot = await FirebaseFirestore.instance
+          .collection('todoTasks')
+          .doc(userId)
+          .get();
+
+      if (userTasksSnapshot.exists) {
+        List<dynamic> userTasks = userTasksSnapshot['Todotasks'] ?? [];
+
+        // Filter out tasks related to this group
+        List<dynamic> filteredTasks = userTasks.where((task) {
+          return task['groupName'] != groupName;
+        }).toList();
+
+        await FirebaseFirestore.instance
+            .collection('todoTasks')
+            .doc(userId)
+            .set({
+          'Todotasks': filteredTasks,
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      print('Error removing group tasks from user: $e');
+    }
+  }
+
 
   void _copyGroupLink() {
     final String groupLink =
@@ -787,6 +849,7 @@ class _TaskManagerState extends State<TaskManager> {
     );
   }
 }
+
 class TaskPopupItem extends StatelessWidget {
   final String task;
   final String groupId;

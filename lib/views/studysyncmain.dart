@@ -187,7 +187,7 @@ class ToDoSection extends StatefulWidget {
 }
 
 class _ToDoSectionState extends State<ToDoSection> {
-  DateTime? selectedDate; // Define selectedDate here if you haven't already
+  DateTime? selectedDate;
 
   @override
   Widget build(BuildContext context) {
@@ -216,140 +216,18 @@ class _ToDoSectionState extends State<ToDoSection> {
             }
 
             // Check if either of the snapshots have data
-            if (!todoSnapshot.hasData || !todoSnapshot.data!.exists ||
-                !completedSnapshot.hasData || !completedSnapshot.data!.exists) {
-              return Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Color(0xff003039),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                constraints: BoxConstraints(maxHeight: 400), // Set a maximum height
-                child: Center(
-                  child: TextButton(
-                    onPressed: () {
-                      // Open the dialog to add a new task
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          TextEditingController taskTitleController = TextEditingController();
-                          DateTime? selectedDate;
+            bool hasTodoTasks = todoSnapshot.hasData &&
+                todoSnapshot.data!.exists &&
+                todoSnapshot.data!.get('Todotasks') != null &&
+                todoSnapshot.data!.get('Todotasks').isNotEmpty;
 
-                          return AlertDialog(
-                            title: Text('Add Task'),
-                            content: StatefulBuilder(
-                              builder: (BuildContext context, StateSetter setState) {
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TextField(
-                                      controller: taskTitleController,
-                                      decoration: InputDecoration(labelText: 'Task Title'),
-                                    ),
-                                    SizedBox(height: 16),
-                                    GestureDetector(
-                                      onTap: () async {
-                                        DateTime? pickedDate = await showDatePicker(
-                                          context: context,
-                                          initialDate: selectedDate ?? DateTime.now(),
-                                          firstDate: DateTime(2000),
-                                          lastDate: DateTime(2101),
-                                        );
-
-                                        if (pickedDate != null) {
-                                          setState(() {
-                                            selectedDate = pickedDate;
-                                          });
-                                        }
-                                      },
-                                      child: InputDecorator(
-                                        decoration: InputDecoration(
-                                          labelText: selectedDate != null
-                                              ? 'Selected Date: ${selectedDate!.toLocal()}'.split(' ')[0]
-                                              : 'Select Date',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Text(
-                                            selectedDate != null
-                                                ? '${selectedDate!.toLocal()}'.split(' ')[0]
-                                                : 'No date selected',
-                                            style: TextStyle(
-                                              color: selectedDate != null ? Colors.black : Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                                child: Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  String taskTitle = taskTitleController.text;
-                                  if (taskTitle.isNotEmpty && selectedDate != null) {
-                                    Map<String, dynamic> newTask = {
-                                      'title': taskTitle,
-                                      'date': Timestamp.fromDate(selectedDate!),
-                                      'priority': 1,
-                                    };
-
-                                    FirebaseFirestore.instance
-                                        .collection('todoTasks')
-                                        .doc(userId)
-                                        .set({
-                                      'Todotasks': FieldValue.arrayUnion([newTask])
-                                    }, SetOptions(merge: true))
-                                        .then((_) {
-                                      Navigator.of(context).pop();
-                                    }).catchError((error) {
-                                      print("Failed to add task: $error");
-                                    });
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Please enter a task title and select a date.')),
-                                    );
-                                  }
-                                },
-                                child: Text('Add Task'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_circle, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'Add Item',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
+            bool hasCompletedTasks = completedSnapshot.hasData &&
+                completedSnapshot.data!.exists &&
+                completedSnapshot.data!.get('completedTasks') != null &&
+                completedSnapshot.data!.get('completedTasks').isNotEmpty;
 
             // Fetching TO-DO Tasks
-            List<dynamic> tasks = todoSnapshot.data!.get('Todotasks') ?? [];
+            List<dynamic> tasks = hasTodoTasks ? todoSnapshot.data!.get('Todotasks') : [];
             List<TodoTask> todoList = tasks.map((task) {
               return TodoTask.fromMap(task);
             }).toList()
@@ -361,8 +239,7 @@ class _ToDoSectionState extends State<ToDoSection> {
               });
 
             // Fetching Completed Tasks
-            List<dynamic> completedTasks =
-                completedSnapshot.data!.get('completedTasks') ?? [];
+            List<dynamic> completedTasks = hasCompletedTasks ? completedSnapshot.data!.get('completedTasks') : [];
             List<TodoTask> completedTaskList = completedTasks.map((task) {
               return TodoTask.fromMap(task);
             }).toList()
@@ -374,8 +251,8 @@ class _ToDoSectionState extends State<ToDoSection> {
               });
 
             return Container(
-              constraints: BoxConstraints(maxHeight: 400), // Set a maximum height for the container
-              child: SingleChildScrollView( // Make the entire section scrollable
+              constraints: BoxConstraints(maxHeight: 400),
+              child: SingleChildScrollView(
                 child: Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -401,10 +278,10 @@ class _ToDoSectionState extends State<ToDoSection> {
                         style: TextStyle(color: Colors.white),
                       )
                           : Container(
-                        height: 100, // Set a specific height for the todo list
+                        height: 100,
                         child: ListView.builder(
                           shrinkWrap: true,
-                          physics: AlwaysScrollableScrollPhysics(), // Allow scrolling even if the content fits
+                          physics: AlwaysScrollableScrollPhysics(),
                           itemCount: todoList.length,
                           itemBuilder: (context, index) {
                             return ToDoItem(
@@ -435,10 +312,10 @@ class _ToDoSectionState extends State<ToDoSection> {
                         style: TextStyle(color: Colors.white),
                       )
                           : Container(
-                        height: 100, // Set a specific height for the completed tasks list
+                        height: 100,
                         child: ListView.builder(
                           shrinkWrap: true,
-                          physics: AlwaysScrollableScrollPhysics(), // Allow scrolling even if the content fits
+                          physics: AlwaysScrollableScrollPhysics(),
                           itemCount: completedTaskList.length,
                           itemBuilder: (context, index) {
                             return ToDoItem(
@@ -452,8 +329,8 @@ class _ToDoSectionState extends State<ToDoSection> {
                           },
                         ),
                       ),
-
                       SizedBox(height: 20),
+                      // Add Task Button (always displayed)
                       TextButton(
                         onPressed: () {
                           // Open a dialog to add a new task
@@ -461,7 +338,7 @@ class _ToDoSectionState extends State<ToDoSection> {
                             context: context,
                             builder: (context) {
                               TextEditingController taskTitleController = TextEditingController();
-                              DateTime? selectedDate; // Declare the selected date here
+                              DateTime? selectedDate;
 
                               return AlertDialog(
                                 title: Text('Add Task'),
@@ -474,10 +351,9 @@ class _ToDoSectionState extends State<ToDoSection> {
                                           controller: taskTitleController,
                                           decoration: InputDecoration(labelText: 'Task Title'),
                                         ),
-                                        SizedBox(height: 16), // Add some space between the TextField and the date selector
+                                        SizedBox(height: 16),
                                         GestureDetector(
                                           onTap: () async {
-                                            // Show the date picker dialog
                                             DateTime? pickedDate = await showDatePicker(
                                               context: context,
                                               initialDate: selectedDate ?? DateTime.now(),
@@ -486,7 +362,6 @@ class _ToDoSectionState extends State<ToDoSection> {
                                             );
 
                                             if (pickedDate != null) {
-                                              // Update the selected date
                                               setState(() {
                                                 selectedDate = pickedDate;
                                               });
@@ -495,7 +370,7 @@ class _ToDoSectionState extends State<ToDoSection> {
                                           child: InputDecorator(
                                             decoration: InputDecoration(
                                               labelText: selectedDate != null
-                                                  ? 'Selected Date: ${selectedDate!.toLocal()}'.split(' ')[0] // Display selected date
+                                                  ? 'Selected Date: ${selectedDate!.toLocal()}'.split(' ')[0]
                                                   : 'Select Date',
                                               border: OutlineInputBorder(),
                                             ),
@@ -503,7 +378,7 @@ class _ToDoSectionState extends State<ToDoSection> {
                                               padding: const EdgeInsets.all(8.0),
                                               child: Text(
                                                 selectedDate != null
-                                                    ? '${selectedDate!.toLocal()}'.split(' ')[0] // Display selected date
+                                                    ? '${selectedDate!.toLocal()}'.split(' ')[0]
                                                     : 'No date selected',
                                                 style: TextStyle(
                                                   color: selectedDate != null ? Colors.black : Colors.grey,
@@ -519,34 +394,29 @@ class _ToDoSectionState extends State<ToDoSection> {
                                 actions: [
                                   TextButton(
                                     onPressed: () {
-                                      Navigator.of(context).pop(); // Close the dialog
+                                      Navigator.of(context).pop();
                                     },
                                     child: Text('Cancel'),
                                   ),
                                   TextButton(
                                     onPressed: () {
                                       String taskTitle = taskTitleController.text;
-
-                                      // Ensure the selected date is being used here
                                       if (taskTitle.isNotEmpty && selectedDate != null) {
-                                        // Create a new task object
                                         Map<String, dynamic> newTask = {
                                           'title': taskTitle,
-                                          'date': Timestamp.fromDate(selectedDate!), // Use the selected date as a Timestamp
-                                          'priority': 1, // Set a default priority or get it from your app logic
+                                          'date': Timestamp.fromDate(selectedDate!),
+                                          'priority': 1,
                                         };
 
-                                        // Save to Firestore
                                         FirebaseFirestore.instance
                                             .collection('todoTasks')
                                             .doc(userId)
                                             .set({
                                           'Todotasks': FieldValue.arrayUnion([newTask])
-                                        }, SetOptions(merge: true)) // Merge to avoid overwriting other tasks
+                                        }, SetOptions(merge: true))
                                             .then((_) {
-                                          Navigator.of(context).pop(); // Close the dialog
-                                        })
-                                            .catchError((error) {
+                                          Navigator.of(context).pop();
+                                        }).catchError((error) {
                                           print("Failed to add task: $error");
                                         });
                                       } else {
@@ -563,13 +433,14 @@ class _ToDoSectionState extends State<ToDoSection> {
                           );
                         },
                         child: const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.add_circle, color: Colors.white),
-                            SizedBox(width: 20),
+                            SizedBox(width: 8),
                             Text(
                               'Add Item',
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -577,8 +448,6 @@ class _ToDoSectionState extends State<ToDoSection> {
                           ],
                         ),
                       ),
-
-
                     ],
                   ),
                 ),
@@ -590,6 +459,9 @@ class _ToDoSectionState extends State<ToDoSection> {
     );
   }
 }
+
+
+
 
 // TodoTask model update to include groupName
 class TodoTask {
@@ -883,7 +755,6 @@ class StatBox extends StatelessWidget {
     );
   }
 }
-
 
 class StartStudyingButton extends StatefulWidget {
   @override
